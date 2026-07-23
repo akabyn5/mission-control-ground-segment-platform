@@ -2,7 +2,8 @@
 
 > **An open, modular mission operations platform for CubeSats, educational satellites, and research missions.**
 
-![Project Banner]([images/banner/banner.png](https://github.com/akabyn5/mission-control-ground-segment-platform/blob/main/images/banner/banner%20readme.png?raw=true))
+<img width="1792" height="592" alt="banner readme" src="https://github.com/user-attachments/assets/063665a0-8c58-442b-ae30-486fde1c410d" />
+
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Stars](https://img.shields.io/github/stars/your-username/mission-control-ground-segment-platform.svg)](https://github.com/your-username/mission-control-ground-segment-platform)
@@ -70,6 +71,56 @@ graph TD
     style E fill:#e85d75,stroke:#ffffff,color:#ffffff
     style F fill:#a78bfa,stroke:#ffffff,color:#ffffff
     style G fill:#fb923c,stroke:#ffffff,color:#000000
+```
+
+### C4 Level 1 - System Context Diagram
+
+```mermaid
+graph TD
+    subgraph "Mission Control Ground Segment Platform"
+        MCGS[MCGS - Web-based mission operations platform]
+    end
+
+    Operator[👤 Mission Operator] --> MCGS
+    Telemetry[Telemetry Source] --> MCGS
+    
+    MCGS --> Dashboard[Web Browser - Mission Dashboard]
+    MCGS --> Extension[Chrome Extension]
+    MCGS -.-> AI[Future AI Service]
+    
+    style MCGS fill:#1e40af,stroke:#60a5fa,color:#ffffff
+    style Operator fill:#4b5563,stroke:#9ca3af,color:#ffffff
+    style Telemetry fill:#166534,stroke:#4ade80,color:#ffffff
+    style Dashboard fill:#78350f,stroke:#fbbf24,color:#ffffff
+    style Extension fill:#78350f,stroke:#fbbf24,color:#ffffff
+    style AI fill:#6b21a8,stroke:#c084fc,color:#ffffff
+```
+
+### C4 Level 2 - Container Diagram
+
+```mermaid
+graph TD
+    subgraph "Mission Control Ground Segment Platform"
+        Server[Mission Control Server<br/>FastAPI]
+        DB[(SQLite Database)]
+    end
+
+    Simulator[Telemetry Simulator<br/>Python] --> Server
+    Server --> DB
+    Server --> REST[REST API]
+    Server --> WS[WebSocket]
+    
+    REST --> Dashboard[Mission Dashboard<br/>HTML/CSS/JavaScript]
+    WS --> Dashboard
+    WS --> Extension[Chrome Extension]
+    
+    style Server fill:#1e3a8a,stroke:#60a5fa,color:#ffffff
+    style Simulator fill:#166534,stroke:#4ade80,color:#ffffff
+    style DB fill:#991b1b,stroke:#f87171,color:#ffffff
+    style REST fill:#b45309,stroke:#fbbf24,color:#ffffff
+    style WS fill:#b45309,stroke:#fbbf24,color:#ffffff
+    style Dashboard fill:#6b21a8,stroke:#c084fc,color:#ffffff
+    style Extension fill:#92400e,stroke:#fbbf24,color:#ffffff
 ```
 Core Principles:
 
