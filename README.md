@@ -2,7 +2,7 @@
 
 > **An open, modular mission operations platform for CubeSats, educational satellites, and research missions.**
 
-![Project Banner](images/banner/banner.png)
+![Project Banner]([images/banner/banner.png](https://github.com/akabyn5/mission-control-ground-segment-platform/blob/main/images/banner/banner%20readme.png?raw=true))
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![GitHub Stars](https://img.shields.io/github/stars/your-username/mission-control-ground-segment-platform.svg)](https://github.com/your-username/mission-control-ground-segment-platform)
