@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+
+<title>Telemetry Feed Test</title>
+
+<style>
+
+body{
+    font-family: Arial, Helvetica, sans-serif;
+    background:#111;
+    color:white;
+    padding:40px;
+}
+
+h1{
+    color:#4CAF50;
+}
+
+.card{
+
+    width:350px;
+
+    background:#222;
+
+    padding:20px;
+
+    border-radius:10px;
+
+    margin-top:20px;
+
+}
+
+.value{
+
+    color:#00E5FF;
+
+    font-weight:bold;
+
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Mission Control Telemetry Feed</h1>
+
+<div class="card">
+
+<p>Satellite:
+<span id="satellite" class="value">---</span>
+</p>
+
+<p>Battery:
+<span id="battery" class="value">---</span>
+</p>
+
+<p>Temperature:
+<span id="temperature" class="value">---</span>
+</p>
+
+<p>Signal:
+<span id="signal" class="value">---</span>
+</p>
+
+<p>CPU:
+<span id="cpu" class="value">---</span>
+</p>
+
+<p>Status:
+<span id="status" class="value">---</span>
+</p>
+
+<p>Timestamp:
+<span id="timestamp" class="value">---</span>
+</p>
+
+</div>
+
+<script>
+
+const socket = new WebSocket("ws://127.0.0.1:8000/ws");
+
+socket.onopen = () => {
+
+    console.log("Connected to WebSocket");
+
+};
+
+socket.onmessage = (event) => {
+
+    const telemetry = JSON.parse(event.data);
+
+    console.log(telemetry);
+
+    document.getElementById("satellite").textContent =
+        telemetry.satellite_id;
+
+    document.getElementById("battery").textContent =
+        telemetry.battery + " %";
+
+    document.getElementById("temperature").textContent =
+        telemetry.temperature + " °C";
+
+    document.getElementById("signal").textContent =
+        telemetry.signal_strength + " %";
+
+    document.getElementById("cpu").textContent =
+        telemetry.cpu_load + " %";
+
+    document.getElementById("status").textContent =
+        telemetry.status;
+
+    document.getElementById("timestamp").textContent =
+        telemetry.timestamp;
+};
+
+socket.onclose = () => {
+
+    console.log("WebSocket disconnected");
+
+};
+
+</script>
+
+</body>
+</html>
