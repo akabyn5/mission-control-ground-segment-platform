@@ -17,12 +17,18 @@ satellite = EarthSatellite(
 )
 
 
-def get_current_position():
+def get_current_position(offset_minutes=0):
     """
-    Returns the current orbital state.
+    Returns the orbital state `offset_minutes` minutes from now.
+
+    The optional offset lets multiple simulated satellites share the same
+    underlying orbit (see backend/simulator/tle.py) while appearing at
+    different points along it, instead of every satellite reporting an
+    identical position. Defaults to 0, which preserves the exact original
+    single-satellite behavior for any other caller.
     """
 
-    t = ts.now()
+    t = ts.now() + offset_minutes / (24 * 60)
 
     geocentric = satellite.at(t)
 

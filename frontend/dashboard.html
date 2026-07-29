@@ -16,7 +16,6 @@
 
 </head>
 
-
 <body>
 
     <div class="container">
@@ -28,37 +27,28 @@
         </header>
 
         <!-- ========================= -->
-        <!-- Mission Status Cards -->
+        <!-- Fleet Summary Cards -->
         <!-- ========================= -->
-         <section class="status-grid">
-            <div class="status-card">
-                <h3>Satellite</h3>
-                <p id="satelliteCard">---</p>
-            </div>
-            
-            <div class="status-card">
-                <h3>Status</h3>
-                <p id="statusCard">---</p>
-            </div>
-            
-            <div class="status-card">
-                <h3>Battery</h3>
-                <p id="batteryCard">---</p>
-            </div>
-            
-            <div class="status-card">
-                <h3>Signal</h3>
-                <p id="signalCard">---</p>
-            </div>
+         <section id="fleetSummary" class="status-grid">
+            <!-- One card per satellite, created and updated by dashboard.js
+                 as telemetry arrives. Always shows every known satellite
+                 at once (fleet-wide status at a glance). -->
         </section>
-        
+
         <!-- ========================= -->
         <!-- Live Telemetry Card -->
         <!-- ========================= -->
 
         <section class="card">
 
-            <h2>Live Telemetry</h2>
+            <div class="map-header">
+                <h2>Live Telemetry</h2>
+                <select id="satelliteSelector">
+                    <!-- Populated by dashboard.js as satellites are seen.
+                         Scopes this panel and the three charts below to a
+                         single satellite at a time. -->
+                </select>
+            </div>
 
             <div class="telemetry-grid">
 
