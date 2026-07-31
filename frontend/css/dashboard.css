@@ -250,6 +250,92 @@ h1 {
 
 /* ========================= */
 
+/* Subsystem Health */
+
+/* ========================= */
+
+/* Rows are built by buildSubsystemHealthRows() in dashboard.js, from the
+   ordered subsystem list GET /config returns — this file has no idea how
+   many subsystems there are or what they're called. */
+
+.subsystem-health-list {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 10px;
+
+}
+
+.subsystem-row {
+
+    display: flex;
+
+    justify-content: space-between;
+
+    align-items: center;
+
+}
+
+.subsystem-name {
+
+    font-weight: bold;
+
+}
+
+/* A pill-shaped badge, layered on top of the plain .nominal/.warning/
+
+   .critical text-color rules above via a compound selector
+
+   (.subsystem-badge.nominal etc. is more specific than .nominal alone),
+
+   so the same three status colors mean the same thing everywhere on the
+
+   dashboard while still getting a distinct colored-background "badge"
+
+   look here, matching the mission-control mockup this panel is based on. */
+
+.subsystem-badge {
+
+    display: inline-block;
+
+    padding: 4px 12px;
+
+    border-radius: 12px;
+
+    font-weight: bold;
+
+    font-size: 13px;
+
+}
+
+.subsystem-badge.nominal {
+
+    background: rgba(76, 175, 80, 0.15);
+
+    color: #4CAF50;
+
+}
+
+.subsystem-badge.warning {
+
+    background: rgba(255, 193, 7, 0.15);
+
+    color: #FFC107;
+
+}
+
+.subsystem-badge.critical {
+
+    background: rgba(244, 67, 54, 0.15);
+
+    color: #F44336;
+
+}
+
+/* ========================= */
+
 /* Leaflet Map */
 
 /* ========================= */
@@ -382,13 +468,19 @@ h1 {
 
 }
 
-/* Event-type colors for .timeline-type: Telemetry reuses the same green
-   as .nominal (routine, healthy), Battery reuses the same orange as the
-   Temperature chart line, and Warning/Critical reuse the exact same
-   .warning/.critical palette as the fleet cards, so an event's color
-   means the same thing everywhere on the dashboard. */
+/* Event-type colors for .timeline-type: Telemetry and Recovery both reuse
+   the same green as .nominal ("this is good news"), Battery reuses the
+   same orange as the Temperature chart line, and Warning/Critical reuse
+   the exact same .warning/.critical palette as the fleet cards, so an
+   event's color means the same thing everywhere on the dashboard. */
 
 .timeline-telemetry .timeline-type {
+
+    color: #4CAF50;
+
+}
+
+.timeline-recovery .timeline-type {
 
     color: #4CAF50;
 

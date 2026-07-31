@@ -10,9 +10,9 @@
 
 // to ask. Everything else (WebSocket URL, REST API origin, project name,
 
-// update rate, satellite name) is fetched from the backend's centralized
+// update rate, satellite name, subsystem list) is fetched from the
 
-// configuration below.
+// backend's centralized configuration below.
 
 const BACKEND_ORIGIN = "http://127.0.0.1:8000";
 
@@ -34,11 +34,13 @@ const BACKEND_ORIGIN = "http://127.0.0.1:8000";
 
 const fleet = new Map();
 
-// Which satellite the "Live Telemetry" panel and the three charts are
+// Which satellite the "Live Telemetry" panel, the Subsystem Health panel,
 
-// currently scoped to. Fleet cards and the map always show every
+// and the three charts are currently scoped to. Fleet cards and the map
 
-// satellite; this is the one thing that's single-satellite-at-a-time.
+// always show every satellite; this is the one thing that's
+
+// single-satellite-at-a-time.
 
 let selectedSatelliteId = null;
 
@@ -237,6 +239,8 @@ function showSatellite(satelliteId) {
     if (entry.latest) {
 
         updateDetailPanel(entry.latest);
+
+        updateSubsystemHealthPanel(entry.latest);
 
     }
 
@@ -504,6 +508,18 @@ function createFleetCard(satelliteId, color) {
 
 function updateFleetCard(entry, telemetry) {
 
+    // `telemetry.status` is always the backend's own computed value (the
+
+    // worst of its subsystems — see health_status.worst_status(), called
+
+    // from backend/app/routers/telemetry.py) and never client input, so
+
+    // this file uses it directly rather than recomputing "worst subsystem"
+
+    // itself from `telemetry.subsystems` — the backend is the single
+
+    // source of truth for overall status, this file only displays it.
+
     const statusEl = entry.card.querySelector(".fleet-status");
 
     statusEl.textContent = telemetry.status;
@@ -702,7 +718,13 @@ const alarmBanner = document.getElementById("alarmBanner");
 
 // Critical always outranks Warning; these are the only two levels the
 
-// backend currently sends.
+// backend currently sends. Defensive against `alarms` being missing
+
+// entirely — GET /telemetry/history and GET /telemetry don't populate it
+
+// (see backend/app/schemas/telemetry.py), so a bootstrap-replayed sample
+
+// may not have it.
 
 function highestAlarmLevel(alarms) {
 
@@ -828,6 +850,98 @@ function updateAlarmBanner() {
 
 // =========================
 
+// Subsystem Health panel — selector-scoped
+
+// =========================
+
+// Replaces the old single "Status" row in the Live Telemetry card. Rows
+
+// are built once GET /config resolves (see buildSubsystemHealthRows,
+
+// called from initDashboard below) from the ordered subsystem list the
+
+// backend returns — nothing in this file hardcodes "power"/"thermal"/etc.
+
+const subsystemHealthContainer = document.getElementById("subsystemHealth");
+
+// The ordered {key, label} list from GET /config. Used both to build the
+
+// panel below AND to detect subsystem transitions for the Mission
+
+// Timeline (see pushTimelineEvents) — the one place in this file that
+
+// knows the subsystem list, so nothing else has to.
+
+let SUBSYSTEM_LIST = [];
+
+// {key: badgeElement}, built by buildSubsystemHealthRows() alongside
+
+// SUBSYSTEM_LIST above, so updateSubsystemHealthPanel() doesn't need to
+
+// re-query the DOM on every telemetry sample.
+
+let subsystemBadges = {};
+
+function buildSubsystemHealthRows(subsystems) {
+
+    SUBSYSTEM_LIST = subsystems || [];
+
+    subsystemHealthContainer.innerHTML = "";
+
+    subsystemBadges = {};
+
+    for (const subsystem of SUBSYSTEM_LIST) {
+
+        const row = document.createElement("div");
+
+        row.className = "subsystem-row";
+
+        row.innerHTML = `
+
+            <span class="subsystem-name">${subsystem.label}</span>
+
+            <span class="subsystem-badge">---</span>
+
+        `;
+
+        subsystemHealthContainer.appendChild(row);
+
+        subsystemBadges[subsystem.key] = row.querySelector(".subsystem-badge");
+
+    }
+
+}
+
+// `telemetry.subsystems` may be `{}` (or absent) — historical records from
+
+// before this field existed, or from GET /telemetry/history in general,
+
+// which doesn't backfill it (see backend/app/schemas/telemetry.py). Every
+
+// access below goes through this defensive lookup rather than
+
+// `telemetry.subsystems[key]` directly, so a missing/incomplete dict shows
+
+// "---" instead of throwing.
+
+function updateSubsystemHealthPanel(telemetry) {
+
+    const subsystems = telemetry.subsystems || {};
+
+    for (const [key, badge] of Object.entries(subsystemBadges)) {
+
+        const state = subsystems[key];
+
+        badge.textContent = state || "---";
+
+        badge.className = "subsystem-badge " + (state ? statusClass(state) : "");
+
+    }
+
+}
+
+// =========================
+
 // Mission Timeline
 
 // =========================
@@ -878,27 +992,27 @@ function addTimelineEvent(satelliteId, eventType, description, timestamp) {
 
 // Derives the mission-timeline events implied by one telemetry sample,
 
-// compared against that same satellite's previous sample (if any).
+// compared against that same satellite's previous sample (if any). Called
 
-// Called from updateDashboard() for both the live WebSocket stream and
+// from updateDashboard() for both the live WebSocket stream and the
 
-// the bootstrap history replay, so the timeline is populated from both.
+// bootstrap history replay, so the timeline is populated from both.
 
 //
 
 // NOTE: GET /telemetry/history (used by the bootstrap replay) does not
 
-// re-evaluate alarms for historical records — see the `alarms` field
+// re-evaluate alarms for historical records, and doesn't backfill
 
-// description in backend/app/schemas/telemetry.py — so `previousTelemetry`
+// `subsystems` for records stored before that field existed either — see
 
-// and `telemetry` will both have `alarms: []` during bootstrap. Alarm
+// backend/app/schemas/telemetry.py. Both `telemetry.alarms` and
 
-// timeline entries and alarm visuals therefore only appear once the first
+// `telemetry.subsystems` are accessed defensively below (`|| []`/`|| {}`)
 
-// live WebSocket sample arrives after page load, the same way a
+// for exactly that reason: a bootstrap-replayed sample may have empty
 
-// genuinely-new alarm always would.
+// versions of either, and that must never throw.
 
 function pushTimelineEvents(telemetry, previousTelemetry) {
 
@@ -942,25 +1056,89 @@ function pushTimelineEvents(telemetry, previousTelemetry) {
 
     }
 
+    // Subsystem transitions — one Timeline entry per subsystem whose state
+
+    // actually changed since the previous sample, including recovering
+
+    // back to Nominal (labeled "Recovery" — alarms alone can't express
+
+    // that: the alarms list only contains what's currently WRONG, not
+
+    // what just got fixed). Uses SUBSYSTEM_LIST (populated once from
+
+    // GET /config — see initDashboard) rather than hardcoding subsystem
+
+    // names, and both sides of the comparison are defensively defaulted
+
+    // to {} in case either sample predates the `subsystems` field.
+
+    if (previousTelemetry) {
+
+        const previousSubsystems = previousTelemetry.subsystems || {};
+
+        const currentSubsystems = telemetry.subsystems || {};
+
+        for (const subsystem of SUBSYSTEM_LIST) {
+
+            const previousState = previousSubsystems[subsystem.key];
+
+            const currentState = currentSubsystems[subsystem.key];
+
+            if (currentState === undefined || currentState === previousState) {
+
+                continue;
+
+            }
+
+            if (currentState === "Nominal") {
+
+                addTimelineEvent(
+
+                    telemetry.satellite_id,
+
+                    "Recovery",
+
+                    `${subsystem.label} restored`,
+
+                    telemetry.timestamp
+
+                );
+
+            } else {
+
+                addTimelineEvent(
+
+                    telemetry.satellite_id,
+
+                    currentState, // "Warning" or "Critical"
+
+                    `${subsystem.label}: ${previousState || "Unknown"} → ${currentState}`,
+
+                    telemetry.timestamp
+
+                );
+
+            }
+
+        }
+
+    }
+
     // Alarms — one Timeline entry per NEWLY-triggered alarm rule, not on
 
-    // every packet an already-active alarm stays active (matching the
+    // every packet an already-active alarm stays active. Alarms with a
 
-    // same edge-triggered pattern the old dedicated Warning/Critical
+    // `subsystem` set are skipped here: the subsystem-transition loop
 
-    // status block used to implement by itself). The backend's
+    // above already narrates them, in more detail (including recovery,
 
-    // "status_warning"/"status_critical" rules (see
+    // which an alarm's mere presence/absence can't express) — including
 
-    // backend/app/core/alarms.py) now cover that exact case — a plain
+    // both here would show the operator two Timeline rows for one
 
-    // status change to Warning/Critical — as part of this same generic
+    // underlying change. Only numeric-only alarms (currently just
 
-    // loop, so that dedicated block was removed rather than kept
-
-    // alongside this one, which would have logged every such transition
-
-    // twice.
+    // cpu_warning — see backend/app/core/alarms.py) reach this loop.
 
     const currentAlarms = telemetry.alarms || [];
 
@@ -972,23 +1150,15 @@ function pushTimelineEvents(telemetry, previousTelemetry) {
 
     for (const alarm of currentAlarms) {
 
+        if (alarm.subsystem) {
+
+            continue;
+
+        }
+
         if (!previousAlarmRules.has(alarm.rule)) {
 
-            addTimelineEvent(
-
-                telemetry.satellite_id,
-
-                alarm.level, // "Warning" or "Critical" — reuses the same
-
-                             // .timeline-warning/.timeline-critical CSS
-
-                             // already defined for this event type.
-
-                alarm.message,
-
-                telemetry.timestamp
-
-            );
+            addTimelineEvent(telemetry.satellite_id, alarm.level, alarm.message, telemetry.timestamp);
 
         }
 
@@ -1023,10 +1193,6 @@ function updateDetailPanel(telemetry) {
     document.getElementById("cpu").textContent =
 
         telemetry.cpu_load + " %";
-
-    document.getElementById("status").textContent =
-
-        telemetry.status;
 
     document.getElementById("timestamp").textContent =
 
@@ -1158,6 +1324,8 @@ function updateDashboard(telemetry, isBootstrap = false) {
 
         updateDetailPanel(telemetry);
 
+        updateSubsystemHealthPanel(telemetry);
+
         renderChartsFor(entry);
 
         if (trackingEnabled && !isBootstrap) {
@@ -1182,9 +1350,11 @@ function updateDashboard(telemetry, isBootstrap = false) {
 
 // =========================
 
-// Everything that needs to know the backend's real URLs waits for this
+// Everything that needs to know the backend's real URLs (or the subsystem
 
-// to complete, instead of being hardcoded at module-load time.
+// list) waits for this to complete, instead of being hardcoded at
+
+// module-load time.
 
 async function initDashboard() {
 
@@ -1203,6 +1373,16 @@ async function initDashboard() {
         return;
 
     }
+
+    // Subsystem Health panel rows must exist before any telemetry arrives
+
+    // (bootstrapFleet below, or the first WebSocket message), since
+
+    // updateSubsystemHealthPanel() only updates existing badge elements —
+
+    // it doesn't create them.
+
+    buildSubsystemHealthRows(config.subsystems);
 
     // =========================
 

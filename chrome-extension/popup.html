@@ -2,220 +2,288 @@
 <html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <title>Mission Control</title>
 
-<meta charset="UTF-8">
+    <style>
+        body {
+            width: 300px;
+            margin: 0;
+            padding: 18px;
+            background: #111;
+            color: white;
+            font-family: Arial, Helvetica, sans-serif;
+        }
 
-<title>Mission Control</title>
+        h2 {
+            margin-top: 0;
+            text-align: center;
+            color: #4CAF50;
+        }
 
-<style>
+        h3 {
+            margin: 18px 0 10px;
+            color: #00E5FF;
+            font-size: 14px;
+        }
 
-body{
-    width:280px;
-    margin:0;
-    padding:18px;
-    background:#111;
-    color:white;
-    font-family:Arial, Helvetica, sans-serif;
-}
+        .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin: 10px 0;
+        }
 
-h2{
-    margin-top:0;
-    text-align:center;
-    color:#4CAF50;
-}
+        .label {
+            font-weight: bold;
+        }
 
-.row{
-    display:flex;
-    justify-content:space-between;
-    margin:10px 0;
-}
+        .value {
+            color: #00E5FF;
+            text-align: right;
+            word-break: break-word;
+        }
 
-.label{
-    font-weight:bold;
-}
+        .nominal {
+            color: #4CAF50;
+            font-weight: bold;
+        }
 
-.value{
-    color:#00E5FF;
-}
+        .warning {
+            color: #FFC107;
+            font-weight: bold;
+        }
 
-/* Status colors */
+        .critical {
+            color: #F44336;
+            font-weight: bold;
+        }
 
-.nominal{
-    color:#4CAF50;
-    font-weight:bold;
-}
+        hr {
+            margin: 18px 0;
+            border: none;
+            border-top: 1px solid #333;
+        }
 
-.warning{
-    color:#FFC107;
-    font-weight:bold;
-}
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
 
-.critical{
-    color:#F44336;
-    font-weight:bold;
-}
+        button:hover {
+            background: #43a047;
+        }
 
-hr{
+        .connection {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 18px;
+            font-size: 14px;
+        }
 
-    margin:18px 0;
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #FFC107;
+        }
 
-    border:none;
+        .connected {
+            background: #4CAF50;
+        }
 
-    border-top:1px solid #333;
+        .disconnected {
+            background: #F44336;
+        }
 
-}
+        #refreshButton {
+            background: #2196F3;
+        }
 
-button{
+        #refreshButton:hover {
+            background: #1976D2;
+        }
 
-    width:100%;
+        .subsystem-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
 
-    padding:10px;
+        .subsystem-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            padding: 6px 0;
+        }
 
-    background:#4CAF50;
+        .subsystem-name {
+            font-weight: bold;
+        }
 
-    color:white;
+        .subsystem-badge {
+            display: inline-block;
+            min-width: 72px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
 
-    border:none;
+        .subsystem-badge.nominal {
+            background: rgba(76, 175, 80, 0.15);
+        }
 
-    border-radius:6px;
+        .subsystem-badge.warning {
+            background: rgba(255, 193, 7, 0.15);
+        }
 
-    font-size:14px;
+        .subsystem-badge.critical {
+            background: rgba(244, 67, 54, 0.15);
+        }
 
-    cursor:pointer;
+        .alarm-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
 
-}
+        .alarm-item {
+            padding: 8px 10px;
+            border-radius: 6px;
+            background: #222;
+            border-left: 4px solid #FFC107;
+            font-size: 12px;
+            line-height: 1.4;
+        }
 
-button:hover{
+        .alarm-item.warning {
+            border-left-color: #FFC107;
+        }
 
-    background:#43a047;
+        .alarm-item.critical {
+            border-left-color: #F44336;
+        }
 
-}
+        .no-alarms {
+            color: #888;
+            font-size: 12px;
+            text-align: center;
+            padding: 8px 0;
+        }
 
-.connection{
+        .error-message {
+            color: #F44336;
+            font-size: 12px;
+            text-align: center;
+            margin: 10px 0;
+        }
 
-    display:flex;
+        .section {
+            margin-top: 4px;
+        }
 
-    align-items:center;
-
-    justify-content:center;
-
-    gap:8px;
-
-    margin-bottom:18px;
-
-    font-size:14px;
-
-}
-
-.dot{
-
-    width:10px;
-
-    height:10px;
-
-    border-radius:50%;
-
-    background:#FFC107;
-
-}
-
-.connected{
-
-    background:#4CAF50;
-
-}
-
-.disconnected{
-
-    background:#F44336;
-
-}
-
-#refreshButton{
-
-    background:#2196F3;
-
-}
-
-#refreshButton:hover{
-
-    background:#1976D2;
-
-}
-
-</style>
-
+        #lastUpdate {
+            color: #00E5FF;
+        }
+    </style>
 </head>
 
 <body>
 
-<h2>Mission Control</h2>
-<div class="connection">
+    <h2>Mission Control</h2>
+
+    <div class="connection">
+        <div id="connectionDot" class="dot"></div>
+        <span id="connectionText">Connecting...</span>
+    </div>
+
     <div
-    id="connectionDot"
-    class="dot">
-</div>
+        style="
+            text-align: center;
+            color: #999;
+            font-size: 12px;
+            margin-bottom: 18px;
+        "
+    >
+        Last update:
+        <span id="lastUpdate">---</span>
+    </div>
 
-<span id="connectionText">
-    Connecting...
-</span>
+    <div id="errorMessage" class="error-message"></div>
 
-</div>
-<div
-style="
-text-align:center;
-color:#999;
-font-size:12px;
-margin-bottom:18px;">
-Last update:
-<span id="lastUpdate">
-    ---
-</span>
+    <div class="row">
+        <span class="label">Satellite</span>
+        <span id="satellite" class="value">---</span>
+    </div>
 
-</div>
-<div class="row">
-<span class="label">Satellite</span>
-<span id="satellite" class="value">---</span>
-</div>
+    <div class="row">
+        <span class="label">Battery</span>
+        <span id="battery" class="value">---</span>
+    </div>
 
-<div class="row">
-<span class="label">Battery</span>
-<span id="battery" class="value">---</span>
-</div>
+    <div class="row">
+        <span class="label">Temperature</span>
+        <span id="temperature" class="value">---</span>
+    </div>
 
-<div class="row">
-<span class="label">Temperature</span>
-<span id="temperature" class="value">---</span>
-</div>
+    <div class="row">
+        <span class="label">Signal</span>
+        <span id="signal" class="value">---</span>
+    </div>
 
-<div class="row">
-<span class="label">Signal</span>
-<span id="signal" class="value">---</span>
-</div>
+    <div class="row">
+        <span class="label">CPU</span>
+        <span id="cpu" class="value">---</span>
+    </div>
 
-<div class="row">
-<span class="label">CPU</span>
-<span id="cpu" class="value">---</span>
-</div>
+    <div class="row">
+        <span class="label">Status</span>
+        <span id="status" class="value">---</span>
+    </div>
 
-<div class="row">
-<span class="label">Status</span>
-<span id="status" class="value">---</span>
-</div>
+    <div class="section">
+        <h3>Subsystem Health</h3>
 
-<hr>
+        <div id="subsystemList" class="subsystem-list">
+            <div class="no-alarms">Loading subsystem configuration...</div>
+        </div>
+    </div>
 
-<button id="refreshButton">
-    Refresh Telemetry
-</button>
+    <div class="section">
+        <h3>Active Alarms</h3>
 
-<br><br>
+        <div id="alarmList" class="alarm-list">
+            <div class="no-alarms">No active alarms</div>
+        </div>
+    </div>
 
-<button id="openDashboard">
-    Open Mission Dashboard
-</button>
+    <hr>
 
-<script src="popup.js"></script>
+    <button id="refreshButton">
+        Refresh Telemetry
+    </button>
+
+    <br><br>
+
+    <button id="openDashboard">
+        Open Mission Dashboard
+    </button>
+
+    <script src="popup.js"></script>
 
 </body>
+
 </html>

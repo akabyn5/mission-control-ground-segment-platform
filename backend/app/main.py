@@ -20,6 +20,8 @@ from backend.app.routers import health
 
 from backend.app.database.database import engine, Base
 
+from backend.app.database.migrations import run_migrations
+
 from backend.app.models.telemetry import Telemetry
 
 from backend.app.routers import orbit
@@ -30,11 +32,29 @@ from backend.app.websocket import routes as websocket_routes
 
 # Configure logging before anything else runs, so startup activity
 
-# (table creation, router registration) is captured in the logs too.
+# (migrations, table creation, router registration) is captured in the
+
+# logs too.
 
 configure_logging()
 
 logger = get_logger(__name__)
+
+# Must run BEFORE create_all(): run_migrations() ALTERs an EXISTING
+
+# telemetry table to add any columns a newer version of the Telemetry
+
+# model expects but an older database doesn't have yet (see
+
+# backend/app/database/migrations.py). create_all() only creates tables
+
+# that don't exist at all — it never alters an existing one — so it's the
+
+# right tool for a brand-new database, but the wrong one for an existing
+
+# telemetry.db that predates a model change.
+
+run_migrations(engine)
 
 Base.metadata.create_all(bind=engine)
 

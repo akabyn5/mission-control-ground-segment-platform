@@ -80,6 +80,13 @@ class Settings(BaseSettings):
     UPDATE_RATE: float = 5.0  # seconds between simulated telemetry samples
     SATELLITE_NAME: str = "SD-CUBESAT-001"
 
+    # --- Alarm thresholds -----------------------------------------------
+    BATTERY_CRITICAL_THRESHOLD: float = 20.0
+    BATTERY_WARNING_THRESHOLD: float = 30.0
+    TEMPERATURE_WARNING_THRESHOLD: float = 35.0
+    SIGNAL_WARNING_THRESHOLD: float = 50.0
+    CPU_WARNING_THRESHOLD: float = 85.0
+
     # --- CORS ----------------------------------------------------------
     # Stored as a plain comma-separated string (the natural .env format),
     # not List[str]: pydantic-settings attempts to JSON-decode env values
@@ -100,6 +107,8 @@ class Settings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
+
+    
 
 
 # Instantiated once at import time. Every other module imports this

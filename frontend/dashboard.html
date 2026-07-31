@@ -75,8 +75,9 @@
                 <select id="satelliteSelector">
 
                     <!-- Populated by dashboard.js as satellites are seen.
-                         Scopes this panel and the three charts below to a
-                         single satellite at a time. -->
+                         Scopes this panel, the Subsystem Health panel below,
+                         and the three charts further down to a single
+                         satellite at a time. -->
 
                 </select>
 
@@ -103,10 +104,6 @@
                 <div class="label">CPU</div>
 
                 <div id="cpu" class="value">---</div>
-
-                <div class="label">Status</div>
-
-                <div id="status" class="value">---</div>
 
                 <div class="label">Timestamp</div>
 
@@ -137,6 +134,31 @@
             </div>
 
            
+
+        </section>
+
+        <!-- ========================= -->
+
+        <!-- Subsystem Health -->
+
+        <!-- ========================= -->
+
+        <!-- Replaces the old single "Status: Nominal" row above. Rows are
+             built once by buildSubsystemHealthRows() (see dashboard.js),
+             from the ordered subsystem list returned by GET /config —
+             nothing here or in dashboard.js hardcodes the five subsystem
+             names. Scoped to the selected satellite, same as Live
+             Telemetry above. -->
+
+        <section class="card">
+
+            <h2>Subsystem Health</h2>
+
+            <div id="subsystemHealth" class="subsystem-health-list">
+
+                <!-- Populated by dashboard.js once GET /config resolves. -->
+
+            </div>
 
         </section>
 
@@ -231,9 +253,9 @@
             <ul id="missionTimeline" class="timeline-list">
 
                 <!-- Populated live by dashboard.js: one entry per Telemetry,
-                     Battery, Warning, Critical, or Alarm event, mission-wide
-                     (every satellite's events interleave here, not
-                     per-satellite like the panels above). Newest event
+                     Battery, Recovery, Warning, or Critical event,
+                     mission-wide (every satellite's events interleave here,
+                     not per-satellite like the panels above). Newest event
                      first, capped at the latest 100 entries. -->
 
             </ul>
