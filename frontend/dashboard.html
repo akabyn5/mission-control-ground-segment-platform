@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
@@ -10,8 +11,11 @@
     <link rel="stylesheet" href="css/dashboard.css">
 
     <link
+
     rel="stylesheet"
+
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+
     />
 
 </head>
@@ -27,123 +31,231 @@
         </header>
 
         <!-- ========================= -->
-        <!-- Fleet Summary Cards -->
+
+        <!-- Alarm Banner -->
+
         <!-- ========================= -->
+
+        <div id="alarmBanner" class="alarm-banner">
+
+            <!-- Hidden while no alarm is active. Shown and updated live by
+                 dashboard.js (see updateAlarmBanner) whenever any satellite
+                 in the fleet has an active Warning or Critical alarm —
+                 Critical always takes priority over Warning if both are
+                 active somewhere in the fleet at once. -->
+
+        </div>
+
+        <!-- ========================= -->
+
+        <!-- Fleet Summary Cards -->
+
+        <!-- ========================= -->
+
          <section id="fleetSummary" class="status-grid">
+
             <!-- One card per satellite, created and updated by dashboard.js
                  as telemetry arrives. Always shows every known satellite
                  at once (fleet-wide status at a glance). -->
+
         </section>
 
         <!-- ========================= -->
+
         <!-- Live Telemetry Card -->
+
         <!-- ========================= -->
 
         <section class="card">
 
             <div class="map-header">
+
                 <h2>Live Telemetry</h2>
+
                 <select id="satelliteSelector">
+
                     <!-- Populated by dashboard.js as satellites are seen.
                          Scopes this panel and the three charts below to a
                          single satellite at a time. -->
+
                 </select>
+
             </div>
 
             <div class="telemetry-grid">
 
                 <div class="label">Satellite</div>
+
                 <div id="satellite" class="value">---</div>
 
                 <div class="label">Battery</div>
+
                 <div id="battery" class="value">---</div>
 
                 <div class="label">Temperature</div>
+
                 <div id="temperature" class="value">---</div>
 
                 <div class="label">Signal</div>
+
                 <div id="signal" class="value">---</div>
 
                 <div class="label">CPU</div>
+
                 <div id="cpu" class="value">---</div>
 
                 <div class="label">Status</div>
+
                 <div id="status" class="value">---</div>
 
                 <div class="label">Timestamp</div>
+
                 <div id="timestamp" class="value">---</div>
 
                 <div class="label">Latitude</div>
+
                 <div id="latitude" class="value">---</div>
-                
+
+               
+
                 <div class="label">Longitude</div>
+
                 <div id="longitude" class="value">---</div>
-                
+
+               
+
                 <div class="label">Altitude</div>
+
                 <div id="altitude" class="value">---</div>
-                
+
+               
+
                 <div class="label">Velocity</div>
+
                 <div id="velocity" class="value">---</div>
 
             </div>
-            
+
+           
 
         </section>
 
         <!-- ========================= -->
+
         <!-- Battery Chart -->
+
         <!-- ========================= -->
 
         <section class="card">
+
             <h2>Battery Chart</h2>
+
             <div class="chart-container">
+
                 <canvas id="batteryChart"></canvas>
+
             </div>
+
         </section>
 
         <!-- ========================= -->
+
         <!-- Temperature Chart -->
+
         <!-- ========================= -->
 
         <section class="card">
+
             <h2>Temperature Chart</h2>
+
             <div class="chart-container">
+
                 <canvas id="temperatureChart"></canvas>
+
             </div>
+
         </section>
 
         <!-- ========================= -->
+
         <!-- CPU Chart -->
+
         <!-- ========================= -->
 
         <section class="card">
+
             <h2>CPU Chart</h2>
+
             <div class="chart-container">
+
                 <canvas id="cpuChart"></canvas>
+
             </div>
+
         </section>
 
         <!-- ========================= -->
+
         <!-- Live Ground Track -->
+
         <!-- ========================= -->
+
           <section class="card">
+
             <div class="map-header">
+
                 <h2>Live Ground Track</h2>
+
                 <button id="trackingButton">
+
                     Tracking: ON
+
                 </button>
+
             </div>
+
             <div id="map"></div>
+
+        </section>
+
+        <!-- ========================= -->
+
+        <!-- Mission Timeline -->
+
+        <!-- ========================= -->
+
+        <section class="card">
+
+            <h2>Mission Timeline</h2>
+
+            <ul id="missionTimeline" class="timeline-list">
+
+                <!-- Populated live by dashboard.js: one entry per Telemetry,
+                     Battery, Warning, Critical, or Alarm event, mission-wide
+                     (every satellite's events interleave here, not
+                     per-satellite like the panels above). Newest event
+                     first, capped at the latest 100 entries. -->
+
+            </ul>
+
         </section>
 
     </div>
+
     <!-- Chart.js Library -->
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <!-- Leaflet -->
+
      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
     <!-- Dashboard Logic -->
+
     <script src="js/dashboard.js"></script>
-    
+
+   
+
 </body>
 
 </html>

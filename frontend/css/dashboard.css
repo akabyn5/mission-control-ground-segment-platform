@@ -89,7 +89,9 @@ h1 {
 }
 
 /* ========================= */
+
 /* Mission Status Cards */
+
 /* ========================= */
 
 .status-grid {
@@ -115,7 +117,9 @@ h1 {
     text-align: center;
 
     border-left: 4px solid transparent;
+
     cursor: pointer;
+
     transition: background 0.15s;
 
 }
@@ -149,8 +153,11 @@ h1 {
 }
 
 /* ========================= */
+
 /* Fleet Summary Card Contents */
+
 /* ========================= */
+
 /* The fleet cards under #fleetSummary reuse .status-card for the outer
    shell (background/radius/padding/hover), but their inner fields are
    richer than the old single "one big number" cards, so they use their
@@ -159,8 +166,11 @@ h1 {
 .fleet-status {
 
     display: block;
+
     font-size: 18px;
+
     font-weight: bold;
+
     margin-top: 10px;
 
 }
@@ -168,19 +178,27 @@ h1 {
 .fleet-metrics {
 
     display: flex;
+
     justify-content: center;
+
     gap: 16px;
+
     margin-top: 10px;
+
     font-size: 14px;
+
     color: #cccccc;
 
 }
 
 .fleet-location,
+
 .fleet-updated {
 
     margin-top: 6px;
+
     font-size: 12px;
+
     color: #888888;
 
 }
@@ -207,23 +225,33 @@ h1 {
 }
 
 /* ========================= */
+
 /* Satellite Selector */
+
 /* ========================= */
 
 #satelliteSelector {
 
     background: #222;
+
     color: #00E5FF;
+
     border: 1px solid #333;
+
     border-radius: 6px;
+
     padding: 8px 12px;
+
     font-size: 14px;
+
     cursor: pointer;
 
 }
 
 /* ========================= */
+
 /* Leaflet Map */
+
 /* ========================= */
 
 #map {
@@ -239,7 +267,9 @@ h1 {
 }
 
 /* ========================= */
+
 /* Map Header */
+
 /* ========================= */
 
 .map-header{
@@ -277,5 +307,190 @@ h1 {
 #trackingButton:hover{
 
     background:#43a047;
+
+}
+
+/* ========================= */
+
+/* Mission Timeline */
+
+/* ========================= */
+
+/* Mission-wide chronological event log (see #missionTimeline in
+   dashboard.js) — not per-satellite, so it lives in its own scrollable
+   list rather than reusing .status-card/.fleet-* like the panels above. */
+
+.timeline-list {
+
+    list-style: none;
+
+    margin: 0;
+
+    padding: 0;
+
+    max-height: 400px;
+
+    overflow-y: auto;
+
+}
+
+.timeline-entry {
+
+    display: grid;
+
+    grid-template-columns: 90px 130px 90px 1fr;
+
+    gap: 12px;
+
+    padding: 8px 4px;
+
+    border-bottom: 1px solid #333;
+
+    font-size: 13px;
+
+}
+
+.timeline-entry:last-child {
+
+    border-bottom: none;
+
+}
+
+.timeline-time {
+
+    color: #888888;
+
+}
+
+.timeline-satellite {
+
+    color: #00E5FF;
+
+    font-weight: bold;
+
+}
+
+.timeline-type {
+
+    font-weight: bold;
+
+}
+
+.timeline-description {
+
+    color: #cccccc;
+
+}
+
+/* Event-type colors for .timeline-type: Telemetry reuses the same green
+   as .nominal (routine, healthy), Battery reuses the same orange as the
+   Temperature chart line, and Warning/Critical reuse the exact same
+   .warning/.critical palette as the fleet cards, so an event's color
+   means the same thing everywhere on the dashboard. */
+
+.timeline-telemetry .timeline-type {
+
+    color: #4CAF50;
+
+}
+
+.timeline-battery .timeline-type {
+
+    color: #FF9800;
+
+}
+
+.timeline-warning .timeline-type {
+
+    color: #FFC107;
+
+}
+
+.timeline-critical .timeline-type {
+
+    color: #F44336;
+
+}
+
+/* ========================= */
+
+/* Alarm System */
+
+/* ========================= */
+
+/* Alarms themselves are evaluated entirely on the backend
+   (backend/app/core/alarms.py) — everything here is purely visual
+   display, driven by dashboard.js reading `telemetry.alarms`. Reuses the
+   exact same .warning/.critical palette already used everywhere else on
+   the dashboard, rather than introducing a new alarm-specific color
+   scheme. */
+
+.alarm-banner {
+
+    display: none;
+
+    text-align: center;
+
+    padding: 14px 20px;
+
+    border-radius: 10px;
+
+    margin-bottom: 20px;
+
+    font-weight: bold;
+
+    font-size: 15px;
+
+}
+
+.alarm-banner.visible {
+
+    display: block;
+
+}
+
+.alarm-banner.level-warning {
+
+    background: #3a2f0a;
+
+    color: #FFC107;
+
+    border: 1px solid #FFC107;
+
+}
+
+.alarm-banner.level-critical {
+
+    background: #3a1414;
+
+    color: #F44336;
+
+    border: 1px solid #F44336;
+
+}
+
+/* Generic pulse used for both the Critical banner and a fleet card while
+   it has an active Critical alarm — an opacity pulse rather than a
+   color-specific one so the same animation works on any background. */
+
+@keyframes alarm-pulse {
+
+    0%, 100% {
+
+        opacity: 1;
+
+    }
+
+    50% {
+
+        opacity: 0.55;
+
+    }
+
+}
+
+.alarm-flash {
+
+    animation: alarm-pulse 1s infinite;
 
 }
