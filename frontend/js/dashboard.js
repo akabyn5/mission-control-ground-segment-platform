@@ -952,7 +952,13 @@ function updateSubsystemHealthPanel(telemetry) {
 
 // interleave into a single list here, newest event first, capped at the
 
-// latest 100 entries across the whole fleet.
+// latest 100 VISIBLE entries (MAX_TIMELINE_EVENTS below) — the backend's
+
+// `events` table (see backend/app/models/event.py) retains the complete,
+
+// permanent history regardless of how many of them are currently shown
+
+// here.
 
 const MAX_TIMELINE_EVENTS = 100;
 
@@ -980,7 +986,11 @@ function addTimelineEvent(satelliteId, eventType, description, timestamp) {
 
     timelineList.insertBefore(entryEl, timelineList.firstChild);
 
-    // Keep only the latest MAX_TIMELINE_EVENTS entries.
+    // Keep only the latest MAX_TIMELINE_EVENTS entries VISIBLE. This is a
+
+    // display trim only — it removes DOM rows, not database rows; the
+
+    // backend's `events` table is unaffected and still has the full history.
 
     while (timelineList.children.length > MAX_TIMELINE_EVENTS) {
 
@@ -990,33 +1000,165 @@ function addTimelineEvent(satelliteId, eventType, description, timestamp) {
 
 }
 
-// Derives the mission-timeline events implied by one telemetry sample,
+// =========================
 
-// compared against that same satellite's previous sample (if any). Called
+// Persistent mission events (Battery / Recovery / Warning / Critical)
 
-// from updateDashboard() for both the live WebSocket stream and the
+// =========================
 
-// bootstrap history replay, so the timeline is populated from both.
+// Battery/Recovery/Warning/Critical events are decided and persisted
 
-//
+// entirely by the backend (backend/app/core/events.py) — this file never
 
-// NOTE: GET /telemetry/history (used by the bootstrap replay) does not
+// re-implements that edge-triggered comparison logic itself. Every such
 
-// re-evaluate alarms for historical records, and doesn't backfill
+// event reaches this file one of two ways: bootstrapped from
 
-// `subsystems` for records stored before that field existed either — see
+// `GET /events` on page load (see bootstrapEvents below), or live, via
 
-// backend/app/schemas/telemetry.py. Both `telemetry.alarms` and
+// `telemetry.events` on the WebSocket telemetry broadcast (see
 
-// `telemetry.subsystems` are accessed defensively below (`|| []`/`|| {}`)
+// pushTimelineEvents below). Both paths funnel through renderEvent() so
 
-// for exactly that reason: a bootstrap-replayed sample may have empty
+// the same satellite_id/timestamp/event_type/message are always rendered
 
-// versions of either, and that must never throw.
+// the same way, and so the same event is never rendered twice even if it
 
-function pushTimelineEvents(telemetry, previousTelemetry) {
+// arrives via both paths (e.g. a live event that gets persisted, then
 
-    // Telemetry received — generated every packet, unconditionally.
+// shows up again in a later GET /events call after a page refresh).
+
+// Tracks which events have already been rendered into the Mission
+
+// Timeline DOM, so the same persisted event is never shown twice even if
+
+// it's seen via both the GET /events bootstrap and a live WebSocket
+
+// message (a live event could in principle arrive while bootstrapEvents()
+
+// is still in flight, or a page refresh could re-bootstrap an event
+
+// that's already on screen).
+
+const renderedEventIds = new Set();
+
+// The database event ID (`event.id`) is the preferred, authoritative
+
+// dedup key — two distinct persisted events can otherwise have identical
+
+// satellite/timestamp/type/message (e.g. the same alarm firing again
+
+// later), so deduplicating on message text alone would be wrong; the ID
+
+// is the one thing guaranteed unique per persisted event. A composite
+
+// fallback key is used only if an event somehow arrives without an ID —
+
+// not expected in practice, since every Event row already has one by the
+
+// time it's broadcast or returned by GET /events, but this keeps
+
+// rendering safe rather than throwing if that assumption is ever wrong.
+
+function eventKey(event) {
+
+    if (event.id !== undefined && event.id !== null) {
+
+        return "id:" + event.id;
+
+    }
+
+    return [
+
+        "fallback",
+
+        event.satellite_id,
+
+        event.timestamp,
+
+        event.event_type,
+
+        event.rule,
+
+    ].join("|");
+
+}
+
+function renderEvent(event) {
+
+    const key = eventKey(event);
+
+    if (renderedEventIds.has(key)) {
+
+        return;
+
+    }
+
+    renderedEventIds.add(key);
+
+    addTimelineEvent(event.satellite_id, event.event_type, event.message, event.timestamp);
+
+}
+
+// Fetched once at startup (see initDashboard) to populate the Mission
+
+// Timeline with the persistent event history — this is what makes
+
+// historical anomalies still visible after a browser refresh or a
+
+// backend restart, unlike "Telemetry received" below, which only ever
+
+// exists for the current page session.
+
+async function bootstrapEvents(config) {
+
+    try {
+
+        const response = await fetch(`${config.api_url}/events?limit=100`);
+
+        const events = await response.json();
+
+        if (!Array.isArray(events)) {
+
+            return;
+
+        }
+
+        // Newest-first from the API; replay oldest-first so the final
+
+        // insertBefore-based rendering in addTimelineEvent() ends up
+
+        // newest-at-top — same reasoning as bootstrapFleet() below.
+
+        events.slice().reverse().forEach(renderEvent);
+
+    } catch (error) {
+
+        console.error("Failed to load mission event history:", error);
+
+    }
+
+}
+
+// Derives the mission-timeline entries implied by one telemetry sample.
+
+// Called from updateDashboard() for both the live WebSocket stream and
+
+// the bootstrap history replay, so "Telemetry received" rows keep
+
+// appearing for both, exactly as before.
+
+function pushTimelineEvents(telemetry) {
+
+    // Telemetry received — generated every packet, unconditionally, and
+
+    // entirely client-side. Deliberately NOT a persisted backend event —
+
+    // see the module docstring in backend/app/models/event.py: it isn't
+
+    // an anomaly, so it exists only for the current page session, the
+
+    // same way it always has.
 
     addTimelineEvent(
 
@@ -1030,137 +1172,21 @@ function pushTimelineEvents(telemetry, previousTelemetry) {
 
     );
 
-    // Battery drop — only when battery decreased versus this satellite's
+    // Battery/Recovery/Warning/Critical — whatever new persistent events
 
-    // previous sample. No previous sample (first packet ever seen for
+    // this telemetry sample produced, already decided by the backend (see
 
-    // this satellite) means nothing to compare against, so it's skipped.
+    // backend/app/core/events.py) and attached to this same WebSocket
 
-    if (previousTelemetry && telemetry.battery < previousTelemetry.battery) {
+    // message. Empty on most packets (nothing new happened); GET
 
-        addTimelineEvent(
+    // /telemetry/history-sourced bootstrap samples don't carry an
 
-            telemetry.satellite_id,
+    // `events` key at all, hence the `|| []`.
 
-            "Battery",
+    for (const event of telemetry.events || []) {
 
-            "Battery dropped from " +
-
-                previousTelemetry.battery.toFixed(1) + "% to " +
-
-                telemetry.battery.toFixed(1) + "%",
-
-            telemetry.timestamp
-
-        );
-
-    }
-
-    // Subsystem transitions — one Timeline entry per subsystem whose state
-
-    // actually changed since the previous sample, including recovering
-
-    // back to Nominal (labeled "Recovery" — alarms alone can't express
-
-    // that: the alarms list only contains what's currently WRONG, not
-
-    // what just got fixed). Uses SUBSYSTEM_LIST (populated once from
-
-    // GET /config — see initDashboard) rather than hardcoding subsystem
-
-    // names, and both sides of the comparison are defensively defaulted
-
-    // to {} in case either sample predates the `subsystems` field.
-
-    if (previousTelemetry) {
-
-        const previousSubsystems = previousTelemetry.subsystems || {};
-
-        const currentSubsystems = telemetry.subsystems || {};
-
-        for (const subsystem of SUBSYSTEM_LIST) {
-
-            const previousState = previousSubsystems[subsystem.key];
-
-            const currentState = currentSubsystems[subsystem.key];
-
-            if (currentState === undefined || currentState === previousState) {
-
-                continue;
-
-            }
-
-            if (currentState === "Nominal") {
-
-                addTimelineEvent(
-
-                    telemetry.satellite_id,
-
-                    "Recovery",
-
-                    `${subsystem.label} restored`,
-
-                    telemetry.timestamp
-
-                );
-
-            } else {
-
-                addTimelineEvent(
-
-                    telemetry.satellite_id,
-
-                    currentState, // "Warning" or "Critical"
-
-                    `${subsystem.label}: ${previousState || "Unknown"} → ${currentState}`,
-
-                    telemetry.timestamp
-
-                );
-
-            }
-
-        }
-
-    }
-
-    // Alarms — one Timeline entry per NEWLY-triggered alarm rule, not on
-
-    // every packet an already-active alarm stays active. Alarms with a
-
-    // `subsystem` set are skipped here: the subsystem-transition loop
-
-    // above already narrates them, in more detail (including recovery,
-
-    // which an alarm's mere presence/absence can't express) — including
-
-    // both here would show the operator two Timeline rows for one
-
-    // underlying change. Only numeric-only alarms (currently just
-
-    // cpu_warning — see backend/app/core/alarms.py) reach this loop.
-
-    const currentAlarms = telemetry.alarms || [];
-
-    const previousAlarmRules = new Set(
-
-        ((previousTelemetry && previousTelemetry.alarms) || []).map((alarm) => alarm.rule)
-
-    );
-
-    for (const alarm of currentAlarms) {
-
-        if (alarm.subsystem) {
-
-            continue;
-
-        }
-
-        if (!previousAlarmRules.has(alarm.rule)) {
-
-            addTimelineEvent(telemetry.satellite_id, alarm.level, alarm.message, telemetry.timestamp);
-
-        }
+        renderEvent(event);
 
     }
 

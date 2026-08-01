@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.alarms import evaluate_alarms, log_alarms
 
+from backend.app.core.events import generate_events
+
 from backend.app.core.health_status import worst_status
 
 from backend.app.core.logging_config import get_logger
@@ -23,6 +25,8 @@ from backend.app.core.logging_config import get_logger
 from backend.app.database.dependencies import get_db
 
 from backend.app.models.telemetry import Telemetry
+
+from backend.app.schemas.events import EventResponse
 
 from backend.app.schemas.telemetry import (
 
@@ -60,11 +64,19 @@ logger = get_logger(__name__)
 
         "persists it to the database, evaluates it against the alarm rules "
 
-        "in backend/app/core/alarms.py, and broadcasts it — together with "
+        "in backend/app/core/alarms.py, derives any newly-occurring mission "
 
-        "the computed status and any triggered alarms — to every connected "
+        "events by comparing it against the satellite's previous sample "
 
-        "WebSocket client (see `/ws`) for live dashboard updates."
+        "(see backend/app/core/events.py — persisted to the `events` table "
+
+        "and retrievable later via `GET /events`), and broadcasts the "
+
+        "sample — together with its computed status, alarms, and any new "
+
+        "events — to every connected WebSocket client (see `/ws`) for live "
+
+        "dashboard updates."
 
     ),
 
@@ -136,6 +148,32 @@ async def create_telemetry(
 
     logger.info("Telemetry received from %s", telemetry.satellite_id)
 
+    # Fetched BEFORE constructing/adding the new sample, so event
+
+    # generation (below) compares "what changed since last time" without
+
+    # comparing the new row against itself. None for a satellite's
+
+    # first-ever sample — generate_events() still logs a Warning/Critical
+
+    # alarm present on that very first sample (see the "First-sample
+
+    # anomalies" section of that module's docstring); only the Battery and
+
+    # Recovery event checks require a genuine previous value to exist.
+
+    previous_telemetry = (
+
+        db.query(Telemetry)
+
+        .filter(Telemetry.satellite_id == telemetry.satellite_id)
+
+        .order_by(Telemetry.timestamp.desc())
+
+        .first()
+
+    )
+
     # The backend is the single source of truth for overall status: the
 
     # client (TelemetryCreate) reports only per-subsystem health, never an
@@ -178,13 +216,61 @@ async def create_telemetry(
 
     )
 
+    # Alarms and derived mission events are computed BEFORE the commit
+
+    # below, entirely from values already in memory (telemetry.subsystems/
+
+    # battery/etc. on the object just constructed above, and
+
+    # previous_telemetry fetched above) — none of it needs db_telemetry.id,
+
+    # so none of it needs a flush first. That's what makes it possible to
+
+    # add the telemetry row and every event it produces to the session
+
+    # together and commit exactly once, below.
+
+    alarms = evaluate_alarms(db_telemetry)
+
+    # evaluate_alarms() is called a second time here, against
+
+    # previous_telemetry, purely so generate_events() can diff "which
+
+    # alarm rules are new" — it does not re-evaluate anything against
+
+    # db_telemetry a second time, and does not duplicate any threshold
+
+    # logic (see backend/app/core/events.py's module docstring).
+
+    previous_alarms = (
+
+        evaluate_alarms(previous_telemetry) if previous_telemetry is not None else []
+
+    )
+
+    new_events = generate_events(db_telemetry, previous_telemetry, alarms, previous_alarms)
+
+    # Single transaction: the telemetry sample and every mission event it
+
+    # produces are added to the session together and committed once, so
+
+    # they succeed or fail as one atomic unit. This project's core
+
+    # requirement — "every anomaly stored" — would not hold if telemetry
+
+    # could be durably saved while its derived event silently failed to
+
+    # be; a prior version of this endpoint committed them in two separate
+
+    # transactions and is the reason this comment exists.
+
+    db.add(db_telemetry)
+
+    db.add_all(new_events)
+
     try:
 
-        db.add(db_telemetry)
-
         db.commit()
-
-        db.refresh(db_telemetry)
 
     except SQLAlchemyError:
 
@@ -192,7 +278,9 @@ async def create_telemetry(
 
         logger.exception(
 
-            "Database commit failed while storing telemetry for %s",
+            "Database commit failed while storing telemetry and its "
+
+            "derived mission events for %s",
 
             telemetry.satellite_id
 
@@ -206,33 +294,33 @@ async def create_telemetry(
 
         )
 
+    db.refresh(db_telemetry)
+
+    for event in new_events:
+
+        db.refresh(event)
+
     logger.info(
 
-        "Telemetry stored in database (id=%s, satellite=%s, status=%s)",
+        "Telemetry stored in database (id=%s, satellite=%s, status=%s, events=%d)",
 
         db_telemetry.id,
 
         db_telemetry.satellite_id,
 
-        db_telemetry.status
+        db_telemetry.status,
+
+        len(new_events)
 
     )
 
-    # Alarm evaluation happens once, here, immediately after the sample is
+    # Logged only now, after the commit above has actually succeeded —
 
-    # durably stored — see backend/app/core/alarms.py, the single source
+    # logging an alarm/event as "recorded" before the transaction that
 
-    # of truth for these rules. Any triggered alarms are logged (structured,
+    # persists it is confirmed durable would be misleading if that commit
 
-    # via the existing logging configuration) and attached to the same
-
-    # broadcast message the dashboard already consumes, so the dashboard's
-
-    # Mission Timeline and alarm indicators update from this one message
-
-    # instead of a second, separate alarm channel.
-
-    alarms = evaluate_alarms(db_telemetry)
+    # then failed.
 
     log_alarms(alarms, logger)
 
@@ -264,7 +352,9 @@ async def create_telemetry(
 
         "subsystems": db_telemetry.subsystems,
 
-        "alarms": [alarm.model_dump() for alarm in alarms]
+        "alarms": [alarm.model_dump() for alarm in alarms],
+
+        "events": [EventResponse.model_validate(event).model_dump(mode="json") for event in new_events]
 
     }
 

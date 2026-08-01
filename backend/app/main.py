@@ -22,7 +22,11 @@ from backend.app.database.database import engine, Base
 
 from backend.app.database.migrations import run_migrations
 
+from backend.app.models.event import Event
+
 from backend.app.models.telemetry import Telemetry
+
+from backend.app.routers import events
 
 from backend.app.routers import orbit
 
@@ -148,6 +152,24 @@ TAGS_METADATA = [
 
     {
 
+        "name": "Events",
+
+        "description": (
+
+            "Persisted mission events — Battery drops, subsystem "
+
+            "Recoveries, and newly-triggered Warning/Critical alarms — "
+
+            "retained across restarts, independent of the live WebSocket "
+
+            "telemetry stream."
+
+        ),
+
+    },
+
+    {
+
         "name": "Configuration",
 
         "description": (
@@ -223,6 +245,8 @@ app.add_middleware(
 app.include_router(health.router)
 
 app.include_router(telemetry.router)
+
+app.include_router(events.router)
 
 app.include_router(orbit.router)
 
