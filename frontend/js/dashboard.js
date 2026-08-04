@@ -1330,8 +1330,6 @@ function updateDashboard(telemetry, isBootstrap = false) {
 
     const entry = getOrCreateFleetEntry(telemetry.satellite_id);
 
-    const previousTelemetry = entry.latest;
-
     entry.latest = telemetry;
 
     updateFleetCard(entry, telemetry);
@@ -1344,7 +1342,7 @@ function updateDashboard(telemetry, isBootstrap = false) {
 
     pushChartHistory(entry, telemetry);
 
-    pushTimelineEvents(telemetry, previousTelemetry);
+    pushTimelineEvents(telemetry);
 
     if (telemetry.satellite_id === selectedSatelliteId) {
 
@@ -1515,6 +1513,24 @@ async function initDashboard() {
     }
 
     bootstrapFleet();
+
+    // Loads the persistent mission event history (see
+
+    // backend/app/core/events.py) so anomalies from before this page
+
+    // loaded — including ones from a previous browser session or before a
+
+    // backend restart — are still visible in the Mission Timeline. Must
+
+    // run after buildSubsystemHealthRows() above (already satisfied,
+
+    // since that runs earlier in this function) since bootstrapEvents
+
+    // doesn't depend on it directly, but does depend on `config` for the
+
+    // API origin, same as bootstrapFleet().
+
+    bootstrapEvents(config);
 
     // =========================
 
