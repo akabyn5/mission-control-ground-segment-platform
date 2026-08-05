@@ -62,6 +62,8 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from backend.app.core.health_status import HealthStatus, SUBSYSTEMS
 
+from backend.app.models.satellite_state import ComputerState, OperatingMode
+
 from backend.app.schemas.alarms import Alarm
 
 # Example payload reused across TelemetryCreate and TelemetryResponse so
@@ -324,6 +326,68 @@ class TelemetryCreate(BaseModel):
 
         return value
 
+    # --- Command Uplink state snapshot ----------------------------------
+
+    # A snapshot of this satellite's commanded state (see
+
+    # backend/app/models/satellite_state.py) at generation time — the
+
+    # telemetry simulator fetches it from `GET /satellite-state/{id}`
+
+    # before building each packet (see
+
+    # backend/simulator/telemetry_generator.py) and includes it here, so a
+
+    # command's effect (backend/app/core/commands.py) is observable in
+
+    # subsequent telemetry, not only by separately querying
+
+    # `GET /satellite-state/{id}`.
+
+    # Optional, with defaults matching a satellite that has never received
+
+    # a command (see backend/app/models/satellite_state.py's own
+
+    # defaults): unlike `subsystems` above, these are not made required,
+
+    # since a hypothetical telemetry producer other than this project's own
+
+    # simulator (which is being updated in lockstep with this schema)
+
+    # should not be forced to know about a feature unrelated to its own
+
+    # telemetry.
+
+    payload_enabled: bool = Field(
+
+        False,
+
+        description="Whether the payload is currently enabled — see the ENABLE_PAYLOAD command.",
+
+        examples=[False],
+
+    )
+
+    operating_mode: OperatingMode = Field(
+
+        OperatingMode.NOMINAL,
+
+        description="Current commanded operating mode — see the CHANGE_MODE/ENTER_SAFE_MODE commands. Distinct from subsystem health status; see backend/app/models/satellite_state.py.",
+
+        examples=["NOMINAL"],
+
+    )
+
+    computer_state: ComputerState = Field(
+
+        ComputerState.NORMAL,
+
+        description="Current flight-computer state — NORMAL, or RESTARTING during a simulated RESTART_COMPUTER command.",
+
+        examples=["NORMAL"],
+
+    )
+
     model_config = ConfigDict(
 
         json_schema_extra={"examples": [_EXAMPLE_TELEMETRY_CREATE]}
@@ -459,6 +523,72 @@ class TelemetryResponse(BaseModel):
         examples=[[]],
 
     )
+
+    payload_enabled: bool = Field(
+
+        False,
+
+        description="Whether the payload was enabled at the time of this sample. False (the pre-ENABLE_PAYLOAD default) for records stored before this field existed.",
+
+        examples=[False],
+
+    )
+
+    operating_mode: OperatingMode = Field(
+
+        OperatingMode.NOMINAL,
+
+        description="Commanded operating mode at the time of this sample. NOMINAL (the default) for records stored before this field existed.",
+
+        examples=["NOMINAL"],
+
+    )
+
+    computer_state: ComputerState = Field(
+
+        ComputerState.NORMAL,
+
+        description="Flight-computer state at the time of this sample. NORMAL (the default) for records stored before this field existed.",
+
+        examples=["NORMAL"],
+
+    )
+
+    @field_validator("payload_enabled", "operating_mode", "computer_state", mode="before")
+
+    @classmethod
+
+    def _default_missing_command_state(cls, value):
+
+        """
+
+        Same reasoning as `_default_missing_subsystems` below: telemetry
+
+        rows stored before these three columns existed have them as `None`
+
+        at the database level (backend/app/models/telemetry.py's
+
+        `nullable=True`), which `default_factory`/a plain default alone
+
+        would not catch, since the key is present but explicitly `None`
+
+        rather than absent. Pydantic applies each field's own default
+
+        (False / NOMINAL / NORMAL) when this returns None, since a `None`
+
+        return from a `mode="before"` validator is then validated normally
+
+        against the field's type — which fails for these non-Optional
+
+        fields — so `PydanticUndefined` is returned instead, which signals
+
+        "use the field's default" the same way a genuinely absent key would.
+
+        """
+
+        from pydantic_core import PydanticUndefined
+
+        return value if value is not None else PydanticUndefined
 
     @field_validator("subsystems", mode="before")
 

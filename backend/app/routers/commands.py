@@ -28,7 +28,7 @@ backend/app/models/satellite_state.py's docstring).
 
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 
@@ -196,7 +196,7 @@ async def create_command(
 
         status=CommandStatus.QUEUED,
 
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(UTC),
 
     )
 

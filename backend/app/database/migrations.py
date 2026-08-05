@@ -76,6 +76,12 @@ _MIGRATIONS = [
 
     ("telemetry", "subsystems", "JSON"),
 
+    ("telemetry", "payload_enabled", "BOOLEAN"),
+
+    ("telemetry", "operating_mode", "TEXT"),
+
+    ("telemetry", "computer_state", "TEXT"),
+
 ]
 
 def run_migrations(engine: Engine) -> None:

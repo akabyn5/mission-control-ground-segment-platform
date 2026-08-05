@@ -6,6 +6,8 @@ from sqlalchemy import String
 
 from sqlalchemy import Float
 
+from sqlalchemy import Boolean
+
 from sqlalchemy import DateTime
 
 from sqlalchemy import JSON
@@ -145,6 +147,54 @@ class Telemetry(Base):
     subsystems = Column(
 
         JSON,
+
+        nullable=True
+
+    )
+
+    # Snapshot of this satellite's commanded state (see
+
+    # backend/app/models/satellite_state.py) at the moment this telemetry
+
+    # sample was generated — populated by
+
+    # backend/simulator/telemetry_generator.py, which fetches the current
+
+    # state from `GET /satellite-state/{satellite_id}` before building
+
+    # each packet. This is what makes an executed command's effect
+
+    # (backend/app/core/commands.py) actually observable in subsequent
+
+    # telemetry, not just in the `satellite_state` table itself. Nullable
+
+    # for the same reason `subsystems` above is: these three columns did
+
+    # not exist before the Command Uplink feature, and
+
+    # backend/app/database/migrations.py adds them to an existing
+
+    # telemetry.db without backfilling older rows.
+
+    payload_enabled = Column(
+
+        Boolean,
+
+        nullable=True
+
+    )
+
+    operating_mode = Column(
+
+        String,
+
+        nullable=True
+
+    )
+
+    computer_state = Column(
+
+        String,
 
         nullable=True
 
