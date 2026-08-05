@@ -58,7 +58,7 @@ never client input.
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator
 
 from backend.app.core.health_status import HealthStatus, SUBSYSTEMS
 
@@ -554,11 +554,29 @@ class TelemetryResponse(BaseModel):
 
     )
 
-    @field_validator("payload_enabled", "operating_mode", "computer_state", mode="before")
+    @field_validator(
+
+        "payload_enabled",
+
+        "operating_mode",
+
+        "computer_state",
+
+        mode="before",
+
+    )
 
     @classmethod
 
-    def _default_missing_command_state(cls, value):
+    def _default_missing_command_state(
+
+        cls,
+
+        value,
+
+        info: ValidationInfo,
+
+    ):
 
         """
 
@@ -568,27 +586,49 @@ class TelemetryResponse(BaseModel):
 
         at the database level (backend/app/models/telemetry.py's
 
-        `nullable=True`), which `default_factory`/a plain default alone
+        `nullable=True`), which a plain field default alone would not
 
-        would not catch, since the key is present but explicitly `None`
+        catch, since the key is present but explicitly `None` rather than
 
-        rather than absent. Pydantic applies each field's own default
+        absent.
 
-        (False / NOMINAL / NORMAL) when this returns None, since a `None`
+        Returns each field's own default (False / NOMINAL / NORMAL) by
 
-        return from a `mode="before"` validator is then validated normally
+        name via `info.field_name` — a single `mode="before"` validator
 
-        against the field's type — which fails for these non-Optional
+        shared across three fields has no other way to know which of them
 
-        fields — so `PydanticUndefined` is returned instead, which signals
+        it's currently validating. An earlier version of this validator
 
-        "use the field's default" the same way a genuinely absent key would.
+        tried returning the `pydantic_core.PydanticUndefined` sentinel to
+
+        mean "fall back to the field's default," which does not work: it
+
+        is validated as a literal value against the field's declared type
+
+        and fails (confirmed by testing, not assumed) — there is no
+
+        built-in "use the default" signal a `mode="before"` validator can
+
+        return; the default has to be supplied explicitly, as done here.
 
         """
 
-        from pydantic_core import PydanticUndefined
+        if value is not None:
 
-        return value if value is not None else PydanticUndefined
+            return value
+
+        defaults = {
+
+            "payload_enabled": False,
+
+            "operating_mode": OperatingMode.NOMINAL,
+
+            "computer_state": ComputerState.NORMAL,
+
+        }
+
+        return defaults[info.field_name]
 
     @field_validator("subsystems", mode="before")
 

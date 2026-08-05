@@ -24,21 +24,19 @@ ACKNOWLEDGED -> EXECUTED/FAILED, committing the `commands` row's status
 
 after each stage and broadcasting a `"command_update"` WebSocket message
 
-after each one. The FINAL stage — applying the command's effect to
+after each one. The terminal stage — applying the command's effect to
 
 `satellite_state`, marking the command EXECUTED/FAILED, and recording its
 
 one terminal mission Event — happens as a SINGLE database transaction
 
-(see `_finish()`), so a partial failure there can never leave the
+(see `_finish()`), so a partial failure there can never leave
 
-satellite_state, the command's own status, and the event log
+satellite_state, the command's own status, and the event log disagreeing
 
-disagreeing with each other; and the WebSocket broadcast for that terminal
+with each other; the WebSocket broadcast for that terminal state only
 
-state only happens once that transaction has actually committed, so the
-
-dashboard is never told about a state that wasn't durably saved.
+happens once that transaction has actually committed.
 
 Since the backend and the telemetry-generator process run as separate OS
 
@@ -46,29 +44,57 @@ processes with no shared Python memory, `satellite_state` is a database
 
 table (backend/app/models/satellite_state.py), not an in-process object —
 
-see that module's docstring for the full reasoning.
+see that module's docstring for the full reasoning. The OLD in-process
 
-Restart recovery:
+module `backend/simulator/satellite_state.py` is retired; this module and
 
-FastAPI `BackgroundTasks` are process-local, not a durable queue — if the
+backend/app/models/satellite_state.py are the only satellite-state
 
-backend restarts while a command's lifecycle coroutine is mid-flight
+implementation now.
 
-(status QUEUED/SENT/ACKNOWLEDGED), that coroutine is simply gone; nothing
+Per-satellite command ordering:
 
-will ever advance that command again. `reconcile_after_restart()` below
+`_SATELLITE_LOCKS` below gives each satellite its own `asyncio.Lock`, held
 
-is called once at startup (see backend/app/main.py) to resolve exactly
+for a command's ENTIRE lifecycle (from SENT through EXECUTED/FAILED) —
 
-that: any command left in a non-terminal status is marked FAILED with a
+not just around the moment of a `satellite_state` mutation. A second
 
-clear reason, and any satellite left with computer_state=RESTARTING (which
+command submitted for a satellite that already has one in flight simply
 
-can only happen mid-way through an ACKNOWLEDGED-or-later RESTART_COMPUTER
+waits for the first to fully finish before its own SENT stage even
 
-command) is reset to NORMAL, since the process that was going to do that
+starts. This is what makes "CHANGE_MODE SAFE" immediately followed by
 
-itself no longer exists.
+"CHANGE_MODE NOMINAL" always execute in that submission order, rather
+
+than leaving the final state to whichever one's `asyncio.sleep()`
+
+happened to resolve first. Commands for DIFFERENT satellites are
+
+unaffected by each other's locks and run fully concurrently.
+
+Failure recovery — two layers:
+
+1. Mid-lifecycle failures (e.g. a transient database error between
+
+   stages) are caught by `run_command_lifecycle()`'s own try/except and
+
+   handled by `_compensate_and_fail()`: any `satellite_state` change
+
+   already made (specifically, a RESTART_COMPUTER that had already set
+
+   `computer_state = RESTARTING`) is reset, the command is marked FAILED
+
+   with a clear reason, and its terminal Event is recorded — all in one
+
+   transaction, broadcast only after it commits.
+
+2. Whole-PROCESS failures (the backend itself restarts mid-lifecycle) are
+
+   handled separately, at startup, by `reconcile_after_restart()` below —
+
+   see its own docstring.
 
 """
 
@@ -95,6 +121,46 @@ from backend.app.models.satellite_state import ComputerState, OperatingMode, Sat
 from backend.app.websocket.connection_manager import manager
 
 logger = get_logger(__name__)
+
+# One asyncio.Lock per satellite — see "Per-satellite command ordering" in
+
+# the module docstring. A plain dict + a small accessor (rather than
+
+# collections.defaultdict directly) so the "create a Lock for a
+
+# never-before-seen satellite_id" step is explicit and easy to find.
+
+_SATELLITE_LOCKS: dict[str, asyncio.Lock] = {}
+
+def _lock_for(satellite_id: str) -> asyncio.Lock:
+
+    """
+
+    Returns the asyncio.Lock for `satellite_id`, creating one on first use.
+
+    Safe under asyncio's single-threaded concurrency model: this function
+
+    contains no `await`, so it always runs to completion without another
+
+    coroutine interleaving partway through it — two commands for a
+
+    brand-new satellite_id arriving "at the same time" can't each create
+
+    and use a different Lock object, the way they could under true
+
+    multi-threading.
+
+    """
+
+    lock = _SATELLITE_LOCKS.get(satellite_id)
+
+    if lock is None:
+
+        lock = asyncio.Lock()
+
+        _SATELLITE_LOCKS[satellite_id] = lock
+
+    return lock
 
 # Human-readable event message per command type, used only for the
 
@@ -176,13 +242,17 @@ def _build_event(command: Command) -> Event:
 
     `command`, based on its CURRENT `status`/`failure_reason` — the caller
 
-    is expected to have already set those. Shared by both the normal
+    is expected to have already set those. Shared by every path that can
 
-    lifecycle path (_finish, below) and the startup restart-recovery path
+    produce a command's terminal state: the normal lifecycle (`_finish`),
 
-    (reconcile_after_restart, below), so a command's terminal event is
+    mid-lifecycle compensating failure (`_compensate_and_fail`), and
 
-    worded identically regardless of which of those two paths produced it.
+    startup restart recovery (`reconcile_after_restart`) — so a command's
+
+    terminal event is worded identically no matter which of those produced
+
+    it.
 
     """
 
@@ -230,13 +300,15 @@ async def _advance(command: Command, db: Session, new_status: CommandStatus, **t
 
     `command.status` and any given timestamp columns, commits, refreshes,
 
-    and broadcasts the resulting state. See _finish() below for the
+    and broadcasts the resulting state. A `SQLAlchemyError` here propagates
 
-    terminal (EXECUTED/FAILED) case, which commits the satellite_state
+    to the caller (run_command_lifecycle's try/except), which routes it to
 
-    change, the command's final status, and its mission Event together, as
+    `_compensate_and_fail()` — this function does not attempt its own
 
-    one transaction, instead of using this function.
+    recovery, since at this stage there is no satellite_state effect yet
+
+    to compensate for.
 
     """
 
@@ -274,47 +346,31 @@ async def _finish(
 
     command's satellite_state effect (if any), its final status, and its
 
-    mission Event are all applied. All three are added to the session and
+    mission Event are all applied, in a SINGLE transaction: if the commit
 
-    committed together, in a SINGLE transaction: if the commit fails, none
+    fails, none of the three take effect. The WebSocket broadcast — final
 
-    of the three take effect (SQLAlchemy rolls the whole session back), so
+    command state and the new event together, one broadcast, not two —
 
-    satellite_state, the command's own status, and the event log can never
+    only happens after that commit has actually succeeded.
 
-    end up disagreeing about whether this command actually happened. The
+    If `satellite_state_update` is given but does not update EXACTLY one
 
-    WebSocket broadcast — carrying both the final command state and the
+    `satellite_state` row (0, because the row doesn't exist; or more than
 
-    new event together, one broadcast, not two — only happens AFTER that
+    1, which should be structurally impossible given `satellite_id` is
 
-    commit has actually succeeded; a state that failed to persist is never
+    unique — checked anyway rather than assumed), `new_status` is
 
-    announced as if it had.
+    overridden to FAILED: a command is never reported EXECUTED when its
 
-    `satellite_state_update`, if given, is applied via a single
-
-    `UPDATE ... WHERE satellite_id = ...` against `satellite_state`, in the
-
-    same transaction as everything else here — not via a separate,
-
-    already-committed change earlier in the lifecycle (RESTART_COMPUTER's
-
-    initial "claim the restart" compare-and-set in run_command_lifecycle()
-
-    is the one deliberate exception: that one has to happen earlier and
-
-    separately, since it's a concurrency guard other commands need to see
-
-    immediately, not something to hold open across the remaining simulated
-
-    uplink delay).
+    actual effect could not be verified as applied.
 
     """
 
     if satellite_state_update is not None:
 
-        (
+        updated_rows = (
 
             db.query(SatelliteState)
 
@@ -323,6 +379,18 @@ async def _finish(
             .update(satellite_state_update)
 
         )
+
+        if updated_rows != 1:
+
+            new_status = CommandStatus.FAILED
+
+            command.failure_reason = (
+
+                f"Expected exactly 1 satellite_state row for "
+
+                f"{command.satellite_id!r}, updated {updated_rows}"
+
+            )
 
     command.status = new_status
 
@@ -370,6 +438,116 @@ async def _finish(
 
     })
 
+async def _compensate_and_fail(command_id: int, db: Session, satellite_id: str, reason: str) -> None:
+
+    """
+
+    Last-resort recovery when something inside the `try` block of
+
+    `run_command_lifecycle()` raises partway through — e.g. a transient
+
+    database error between stages, or after a RESTART_COMPUTER has already
+
+    claimed `computer_state = RESTARTING`. The session may be in a
+
+    dirty/half-applied state at this point, so this starts from a clean
+
+    `rollback()` and re-fetches the command fresh, then performs its own
+
+    small, self-contained compensating transaction: if `satellite_id`'s
+
+    `computer_state` is currently RESTARTING, it's reset to NORMAL (the
+
+    only command that could ever set it back is the one that just failed);
+
+    the command is marked FAILED with `reason`; and its one terminal Event
+
+    is recorded — the same one-transaction, broadcast-only-after-commit
+
+    guarantee `_finish()` gives the normal path.
+
+    """
+
+    db.rollback()
+
+    command = db.query(Command).filter(Command.id == command_id).first()
+
+    if command is None:
+
+        logger.error(
+
+            "Command %s disappeared during compensating rollback — nothing to recover.",
+
+            command_id
+
+        )
+
+        return
+
+    (
+
+        db.query(SatelliteState)
+
+        .filter(
+
+            SatelliteState.satellite_id == satellite_id,
+
+            SatelliteState.computer_state == ComputerState.RESTARTING,
+
+        )
+
+        .update({"computer_state": ComputerState.NORMAL, "updated_at": datetime.now(UTC)})
+
+    )
+
+    command.status = CommandStatus.FAILED
+
+    command.failure_reason = reason
+
+    command.executed_at = datetime.now(UTC)
+
+    event = _build_event(command)
+
+    db.add(event)
+
+    try:
+
+        db.commit()
+
+    except SQLAlchemyError:
+
+        db.rollback()
+
+        logger.exception(
+
+            "Compensating rollback itself failed for command %s — left in "
+
+            "its last known status; will be caught by "
+
+            "reconcile_after_restart() on the next backend startup.",
+
+            command.id
+
+        )
+
+        return
+
+    db.refresh(command)
+
+    db.refresh(event)
+
+    logger.warning("Command %s FAILED for %s: %s", command.id, command.satellite_id, reason)
+
+    await manager.broadcast({
+
+        "type": "command_update",
+
+        **_command_dict(command),
+
+        "event": _event_dict(event),
+
+    })
+
 async def run_command_lifecycle(command_id: int) -> None:
 
     """
@@ -382,9 +560,9 @@ async def run_command_lifecycle(command_id: int) -> None:
 
     — background tasks can outlive the request that scheduled them, so
 
-    reusing that request's `Depends(get_db)` session would be relying on
+    reusing that request's `Depends(get_db)` session here would be relying
 
-    FastAPI's dependency-cleanup timing relative to background-task
+    on FastAPI's dependency-cleanup timing relative to background-task
 
     completion, which this avoids entirely by not sharing a session at all.
 
@@ -402,133 +580,155 @@ async def run_command_lifecycle(command_id: int) -> None:
 
             return
 
-        await _advance(command, db, CommandStatus.SENT)
+        satellite_id = command.satellite_id
 
-        await asyncio.sleep(settings.COMMAND_STAGE_DELAY_SECONDS)
+        lock = _lock_for(satellite_id)
 
-        await _advance(command, db, CommandStatus.ACKNOWLEDGED, acknowledged_at=datetime.now(UTC))
+        async with lock:
 
-        await asyncio.sleep(settings.COMMAND_STAGE_DELAY_SECONDS)
+            try:
 
-        command_type = CommandType(command.command_type)
+                await _advance(command, db, CommandStatus.SENT)
 
-        if command_type == CommandType.RESTART_COMPUTER:
+                await asyncio.sleep(settings.COMMAND_STAGE_DELAY_SECONDS)
 
-            # Claim the restart with an atomic UPDATE ... WHERE, not a
+                await _advance(command, db, CommandStatus.ACKNOWLEDGED, acknowledged_at=datetime.now(UTC))
 
-            # Python-level read-then-write: `.update()` with a filter is
+                await asyncio.sleep(settings.COMMAND_STAGE_DELAY_SECONDS)
 
-            # executed as a single SQL statement, so this is safe against
+                command_type = CommandType(command.command_type)
 
-            # a second RESTART_COMPUTER command for the same satellite
+                if command_type == CommandType.RESTART_COMPUTER:
 
-            # reaching this exact point at (effectively) the same time —
+                    # Claim the restart with an atomic UPDATE ... WHERE.
 
-            # whichever one's UPDATE actually runs first wins
+                    # Under normal operation the per-satellite lock above
 
-            # (`claimed_rows == 1`); the other sees `claimed_rows == 0` and
+                    # already guarantees no other command for this
 
-            # fails cleanly. Deliberately a separate, immediately-committed
+                    # satellite can be running concurrently, so this
 
-            # step (unlike the satellite_state changes for every other
+                    # should never actually see `claimed_rows == 0` in
 
-            # command type below, which go through _finish() as part of
+                    # practice — kept anyway as a correctness check that
 
-            # the single terminal transaction) — other commands need to be
+                    # doesn't depend on that invariant holding (e.g. it
 
-            # able to see "this satellite is already restarting" right
+                    # remains correct even if this project were ever
 
-            # away, not only after this command's own multi-second
+                    # deployed with more than one backend worker process,
 
-            # simulated uplink delay finishes.
+                    # where this in-process lock alone would not be
 
-            claimed_rows = (
+                    # enough, but this atomic UPDATE still would be).
 
-                db.query(SatelliteState)
+                    claimed_rows = (
 
-                .filter(
+                        db.query(SatelliteState)
 
-                    SatelliteState.satellite_id == command.satellite_id,
+                        .filter(
 
-                    SatelliteState.computer_state != ComputerState.RESTARTING,
+                            SatelliteState.satellite_id == satellite_id,
+
+                            SatelliteState.computer_state != ComputerState.RESTARTING,
+
+                        )
+
+                        .update({
+
+                            "computer_state": ComputerState.RESTARTING,
+
+                            "updated_at": datetime.now(UTC),
+
+                        })
+
+                    )
+
+                    db.commit()
+
+                    if claimed_rows == 0:
+
+                        command.failure_reason = "Computer is already restarting"
+
+                        await _finish(command, db, CommandStatus.FAILED)
+
+                        logger.warning(
+
+                            "Command %s FAILED for %s: %s",
+
+                            command.id, satellite_id, command.failure_reason
+
+                        )
+
+                        return
+
+                    # Held for its own window — long enough that a
+
+                    # telemetry packet generated during it (see
+
+                    # backend/simulator/telemetry_generator.py) genuinely
+
+                    # observes computer_state=RESTARTING, not just an
+
+                    # instantaneous flicker no one could ever see.
+
+                    await asyncio.sleep(settings.COMMAND_STAGE_DELAY_SECONDS)
+
+                    state_update = {"computer_state": ComputerState.NORMAL, "updated_at": datetime.now(UTC)}
+
+                elif command_type == CommandType.ENABLE_PAYLOAD:
+
+                    state_update = {"payload_enabled": True, "updated_at": datetime.now(UTC)}
+
+                elif command_type == CommandType.CHANGE_MODE:
+
+                    state_update = {"operating_mode": command.parameters["mode"], "updated_at": datetime.now(UTC)}
+
+                elif command_type == CommandType.ENTER_SAFE_MODE:
+
+                    state_update = {"operating_mode": OperatingMode.SAFE, "updated_at": datetime.now(UTC)}
+
+                else:
+
+                    state_update = None
+
+                await _finish(
+
+                    command, db, CommandStatus.EXECUTED,
+
+                    satellite_state_update=state_update,
+
+                    executed_at=datetime.now(UTC),
 
                 )
 
-                .update({
+                logger.info(
 
-                    "computer_state": ComputerState.RESTARTING,
+                    "Command %s EXECUTED for %s (%s)",
 
-                    "updated_at": datetime.now(UTC),
-
-                })
-
-            )
-
-            db.commit()
-
-            if claimed_rows == 0:
-
-                command.failure_reason = "Computer is already restarting"
-
-                await _finish(command, db, CommandStatus.FAILED)
-
-                logger.warning(
-
-                    "Command %s FAILED for %s: %s",
-
-                    command.id, command.satellite_id, command.failure_reason
+                    command.id, satellite_id, command.command_type
 
                 )
 
-                return
+            except Exception:
 
-            # Held for its own window — long enough that a telemetry packet
+                logger.exception(
 
-            # generated during it (see
+                    "Command %s lifecycle failed unexpectedly for %s (%s) — "
 
-            # backend/simulator/telemetry_generator.py) genuinely observes
+                    "performing compensating rollback",
 
-            # computer_state=RESTARTING, not just an instantaneous flicker
+                    command.id, satellite_id, command.command_type
 
-            # no one could ever see.
+                )
 
-            await asyncio.sleep(settings.COMMAND_STAGE_DELAY_SECONDS)
+                await _compensate_and_fail(
 
-            state_update = {"computer_state": ComputerState.NORMAL, "updated_at": datetime.now(UTC)}
+                    command.id, db, satellite_id,
 
-        elif command_type == CommandType.ENABLE_PAYLOAD:
+                    reason="Command execution failed unexpectedly",
 
-            state_update = {"payload_enabled": True, "updated_at": datetime.now(UTC)}
-
-        elif command_type == CommandType.CHANGE_MODE:
-
-            state_update = {"operating_mode": command.parameters["mode"], "updated_at": datetime.now(UTC)}
-
-        elif command_type == CommandType.ENTER_SAFE_MODE:
-
-            state_update = {"operating_mode": OperatingMode.SAFE, "updated_at": datetime.now(UTC)}
-
-        else:
-
-            state_update = None
-
-        await _finish(
-
-            command, db, CommandStatus.EXECUTED,
-
-            satellite_state_update=state_update,
-
-            executed_at=datetime.now(UTC),
-
-        )
-
-        logger.info(
-
-            "Command %s EXECUTED for %s (%s)",
-
-            command.id, command.satellite_id, command.command_type
-
-        )
+                )
 
     finally:
 
@@ -538,21 +738,33 @@ def reconcile_after_restart(db: Session) -> None:
 
     """
 
-    Startup reconciliation for state a backend restart can leave
+    Startup reconciliation for state a BACKEND-PROCESS restart can leave
 
-    inconsistent — see the module docstring's "Restart recovery" section
+    inconsistent — distinct from `_compensate_and_fail()` above, which
 
-    for why this is necessary at all. Called once from
+    handles a single command failing while the backend process keeps
 
-    backend/app/main.py, after ensure_satellite_states(). Synchronous
+    running. FastAPI `BackgroundTasks` are process-local, not a durable
 
-    (not async): runs during application startup, before the event loop is
+    queue: if the whole backend restarts while a command's lifecycle
 
-    serving requests, so there's no WebSocket client connected yet to
+    coroutine is mid-flight (status QUEUED/SENT/ACKNOWLEDGED), that
 
-    broadcast to — commands resolved here simply show their FAILED status
+    coroutine — and every in-process `asyncio.Lock` in `_SATELLITE_LOCKS`
 
-    the next time anything queries GET /commands or GET /commands/{id}.
+    above — is simply gone; nothing will ever advance that command again.
+
+    Called once at startup (see backend/app/main.py), after
+
+    ensure_satellite_states(). Synchronous (not async): runs before the
+
+    event loop is serving requests, so there is no WebSocket client
+
+    connected yet to broadcast to — commands resolved here simply show
+
+    their FAILED status the next time anything queries `GET /commands` or
+
+    `GET /commands/{id}`.
 
     """
 
