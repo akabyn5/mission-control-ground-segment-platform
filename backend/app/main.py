@@ -10,6 +10,8 @@ from fastapi import FastAPI
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.core.commands import reconcile_after_restart
+
 from backend.app.core.config import settings
 
 from backend.app.core.logging_config import configure_logging, get_logger
@@ -18,13 +20,19 @@ from backend.app.routers import config as config_router
 
 from backend.app.routers import health
 
-from backend.app.database.database import engine, Base
+from backend.app.database.database import engine, Base, SessionLocal
 
 from backend.app.database.migrations import run_migrations
 
+from backend.app.models.command import Command
+
 from backend.app.models.event import Event
 
+from backend.app.models.satellite_state import SatelliteState, ensure_satellite_states
+
 from backend.app.models.telemetry import Telemetry
+
+from backend.app.routers import commands
 
 from backend.app.routers import events
 
@@ -60,9 +68,59 @@ logger = get_logger(__name__)
 
 run_migrations(engine)
 
+# Importing Command, Event, SatelliteState, and Telemetry above (not just
+
+# referencing them) is what registers their tables on Base.metadata —
+
+# create_all() only creates tables for model classes that have actually
+
+# been imported/defined somewhere by the time it runs. Simply having a
+
+# model *file* in the project does not register it; the `from ... import`
+
+# above is what does.
+
 Base.metadata.create_all(bind=engine)
 
 logger.info("Database tables verified/created.")
+
+# Startup state initialization/reconciliation — both are idempotent and
+
+# safe to run on every startup, including against a completely fresh
+
+# database (ensure_satellite_states() then just creates every row; there
+
+# is nothing for reconcile_after_restart() to find and fix).
+
+_startup_db = SessionLocal()
+
+try:
+
+    # Creates a default satellite_state row for every satellite in
+
+    # SATELLITE_IDS that doesn't already have one — see
+
+    # backend/app/models/satellite_state.py. Must run before
+
+    # reconcile_after_restart() below, which only touches rows that
+
+    # already exist.
+
+    ensure_satellite_states(_startup_db)
+
+    # Resolves any command left in a non-terminal status, and any
+
+    # satellite left with computer_state=RESTARTING, from a previous
+
+    # backend process that stopped mid-lifecycle — see
+
+    # backend/app/core/commands.py's module docstring ("Restart recovery").
+
+    reconcile_after_restart(_startup_db)
+
+finally:
+
+    _startup_db.close()
 
 # ---------------------------------------------------------------------------
 
@@ -88,19 +146,29 @@ a satellite ground station. It is capable of:
 
   themselves without hardcoded URLs
 
+- **Simulating a command uplink** (`POST /commands`) — a SIMULATION ONLY; no
+
+  real spacecraft are controlled — that changes a satellite's simulated state
+
+  (`GET /satellite-state/{satellite_id}`), which the telemetry simulator then
+
+  reflects in subsequent telemetry
+
 ### Real-time updates
 
 In addition to the REST endpoints documented below, this service exposes a
 
-WebSocket endpoint at **`/ws`** that broadcasts every newly stored telemetry
+WebSocket endpoint at **`/ws`** that broadcasts, to every connected client,
 
-sample to connected clients in real time. WebSocket endpoints are not part
+both newly stored telemetry samples (`"type": "telemetry"`) and command
 
-of the OpenAPI 3.x specification, so `/ws` intentionally does not appear as
+lifecycle transitions (`"type": "command_update"`) in real time. WebSocket
 
-a formal entry in this document. Connect a WebSocket client directly to the
+endpoints are not part of the OpenAPI 3.x specification, so `/ws`
 
-`websocket_url` returned by `GET /config`.
+intentionally does not appear as a formal entry in this document. Connect a
+
+WebSocket client directly to the `websocket_url` returned by `GET /config`.
 
 """
 
@@ -158,11 +226,33 @@ TAGS_METADATA = [
 
             "Persisted mission events — Battery drops, subsystem "
 
-            "Recoveries, and newly-triggered Warning/Critical alarms — "
+            "Recoveries, newly-triggered Warning/Critical alarms, and "
 
-            "retained across restarts, independent of the live WebSocket "
+            "Command outcomes — retained across restarts, independent of "
 
-            "telemetry stream."
+            "the live WebSocket telemetry stream."
+
+        ),
+
+    },
+
+    {
+
+        "name": "Commands",
+
+        "description": (
+
+            "Simulated command uplink — SIMULATION ONLY, no real "
+
+            "spacecraft are controlled. Send a command "
+
+            "(`POST /commands`), track its simulated lifecycle "
+
+            "(`GET /commands/{command_id}`), and read a satellite's "
+
+            "resulting current state (`GET /satellite-state/{satellite_id}`), "
+
+            "which the telemetry simulator reflects in subsequent telemetry."
 
         ),
 
@@ -247,6 +337,8 @@ app.include_router(health.router)
 app.include_router(telemetry.router)
 
 app.include_router(events.router)
+
+app.include_router(commands.router)
 
 app.include_router(orbit.router)
 

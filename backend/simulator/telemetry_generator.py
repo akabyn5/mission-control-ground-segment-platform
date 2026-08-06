@@ -24,9 +24,133 @@ logger = get_logger(__name__)
 
 # Base REST origin comes from centralized settings; only the fixed,
 
-# non-configurable path ("/telemetry") is appended here.
+# non-configurable paths ("/telemetry", "/satellite-state") are appended
+
+# here.
 
 TELEMETRY_ENDPOINT = f"{settings.API_URL}/telemetry"
+
+SATELLITE_STATE_ENDPOINT = f"{settings.API_URL}/satellite-state"
+
+# Bounded timeout for the satellite-state fetch below — this simulator
+
+# runs as its own OS process, on its own fixed cadence (settings.UPDATE_RATE
+
+# between ticks); an unbounded/hanging request to the backend would stall
+
+# the whole loop, including every OTHER satellite's telemetry, not just
+
+# this one's.
+
+SATELLITE_STATE_FETCH_TIMEOUT_SECONDS = 5
+
+# Fallback used the very first time a satellite's state is fetched, before
+
+# _LAST_KNOWN_STATE (below) has anything cached for it — matches
+
+# backend/app/models/satellite_state.py's own defaults for a satellite
+
+# that has never received a command.
+
+_DEFAULT_SATELLITE_STATE = {
+
+    "payload_enabled": False,
+
+    "operating_mode": "NOMINAL",
+
+    "computer_state": "NORMAL",
+
+}
+
+# Per-satellite cache of the last successfully-fetched state, keyed by
+
+# satellite_id. Used as the fallback when a `GET /satellite-state/{id}`
+
+# call fails or times out, so a transient backend hiccup degrades to
+
+# "repeat the last known command-related state" rather than silently
+
+# reverting every satellite to defaults (which would look like every
+
+# command had been undone) or crashing the simulator loop entirely.
+
+_LAST_KNOWN_STATE: dict[str, dict] = {}
+
+def fetch_satellite_state(satellite_id):
+
+    """
+
+    Fetches `satellite_id`'s current simulated state from the backend
+
+    (`GET /satellite-state/{satellite_id}`), so command effects (see
+
+    backend/app/core/commands.py) are reflected in the telemetry this
+
+    simulator generates — the backend and this simulator run as separate
+
+    OS processes with no shared Python memory (see
+
+    backend/app/models/satellite_state.py's docstring), so this HTTP call
+
+    is the only way this process can learn about a command's effect.
+
+    On any failure (network error, timeout, non-200 response) — including
+
+    the backend not having started yet, or a transient restart — falls
+
+    back to this satellite's own last successfully-fetched state, or a
+
+    hardcoded default (no command ever received) if nothing has been
+
+    fetched yet. Never raises: a satellite-state hiccup should degrade
+
+    telemetry generation, not stop it.
+
+    """
+
+    try:
+
+        response = requests.get(
+
+            f"{SATELLITE_STATE_ENDPOINT}/{satellite_id}",
+
+            timeout=SATELLITE_STATE_FETCH_TIMEOUT_SECONDS,
+
+        )
+
+        response.raise_for_status()
+
+        state = response.json()
+
+    except requests.exceptions.RequestException:
+
+        fallback = _LAST_KNOWN_STATE.get(satellite_id, _DEFAULT_SATELLITE_STATE)
+
+        logger.warning(
+
+            "Failed to fetch satellite state for %s; using %s state",
+
+            satellite_id,
+
+            "last-known" if satellite_id in _LAST_KNOWN_STATE else "default"
+
+        )
+
+        return fallback
+
+    result = {
+
+        "payload_enabled": state["payload_enabled"],
+
+        "operating_mode": state["operating_mode"],
+
+        "computer_state": state["computer_state"],
+
+    }
+
+    _LAST_KNOWN_STATE[satellite_id] = result
+
+    return result
 
 # Rough weights for independently rolling each subsystem's health state —
 
@@ -116,11 +240,23 @@ def generate_telemetry(satellite_id):
 
     backend/app/schemas/telemetry.py for why.
 
+    `payload_enabled`/`operating_mode`/`computer_state` come from
+
+    fetch_satellite_state() above, NOT generated independently here — this
+
+    function must read the current commanded state rather than inventing
+
+    a conflicting one on every packet, or a command's effect would never
+
+    actually be observable in telemetry.
+
     """
 
     offset_minutes = SATELLITE_OFFSETS[satellite_id]
 
     position = get_current_position(offset_minutes)
+
+    state = fetch_satellite_state(satellite_id)
 
     return {
 
@@ -143,6 +279,12 @@ def generate_telemetry(satellite_id):
         "cpu_load": round(random.uniform(10, 60), 2),
 
         "subsystems": generate_subsystem_states(),
+
+        "payload_enabled": state["payload_enabled"],
+
+        "operating_mode": state["operating_mode"],
+
+        "computer_state": state["computer_state"],
 
         "timestamp": datetime.now(UTC).isoformat()
 
@@ -180,11 +322,17 @@ def send_telemetry(satellite_id):
 
         logger.info(
 
-            "Telemetry sent successfully (satellite=%s, status_code=%s)",
+            "Telemetry sent successfully (satellite=%s, status_code=%s, mode=%s, payload_enabled=%s, computer_state=%s)",
 
             telemetry["satellite_id"],
 
-            response.status_code
+            response.status_code,
+
+            telemetry["operating_mode"],
+
+            telemetry["payload_enabled"],
+
+            telemetry["computer_state"]
 
         )
 

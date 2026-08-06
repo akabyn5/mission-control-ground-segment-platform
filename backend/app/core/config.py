@@ -178,6 +178,30 @@ class Settings(BaseSettings):
 
     BATTERY_DROP_EVENT_THRESHOLD: float = 2.0
 
+    # --- Command Uplink --------------------------------------------------
+
+    # Simulated delay (seconds) between each stage of a command's uplink
+
+    # lifecycle (QUEUED -> SENT -> ACKNOWLEDGED -> EXECUTED/FAILED — see
+
+    # backend/app/core/commands.py) and, for RESTART_COMPUTER, how long
+
+    # computer_state stays RESTARTING before returning to NORMAL. A small
+
+    # nonzero delay (rather than 0) is what makes the lifecycle observably
+
+    # real — actual stage transitions a client can watch happen over the
+
+    # WebSocket, and an actual window during which
+
+    # backend/simulator/telemetry_generator.py can observe
+
+    # computer_state=RESTARTING — rather than a lifecycle that completes
+
+    # so fast it may as well not have stages at all.
+
+    COMMAND_STAGE_DELAY_SECONDS: float = 2.0
+
     # --- CORS ----------------------------------------------------------
 
     # Stored as a plain comma-separated string (the natural .env format),

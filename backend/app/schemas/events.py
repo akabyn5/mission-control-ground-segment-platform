@@ -6,11 +6,27 @@ Pydantic schema for the persistent mission event log.
 
 backend/app/models/event.py), as returned by `GET /events` and embedded
 
-— as a list, under the `events` key — in the WebSocket telemetry
+in two different WebSocket message shapes: under the `events` key in a
 
-broadcast whenever `POST /telemetry` generates one or more new events
+`"type": "telemetry"` broadcast whenever `POST /telemetry` generates one
 
-(see backend/app/core/events.py and backend/app/routers/telemetry.py).
+or more new events (see backend/app/core/events.py and
+
+backend/app/routers/telemetry.py), and under the `event` key in a
+
+terminal `"type": "command_update"` message whenever a command reaches
+
+EXECUTED or FAILED (see backend/app/core/commands.py).
+
+Supported `event_type` values: "Telemetry" (frontend-only — see
+
+frontend/js/dashboard.js; never actually persisted, so it never appears
+
+in a response from this schema), "Battery", "Recovery", "Warning",
+
+"Critical", and "Command" — the last one distinguishing a command's
+
+outcome from every subsystem/alarm-driven event above it.
 
 """
 
@@ -37,6 +53,26 @@ _EXAMPLE_EVENT = {
     "rule": "power_critical",
 
     "subsystem": "power",
+
+}
+
+_EXAMPLE_COMMAND_EVENT = {
+
+    "id": 18,
+
+    "satellite_id": "SD-CUBESAT-001",
+
+    "timestamp": "2026-07-27T18:36:40Z",
+
+    "event_type": "Command",
+
+    "severity": None,
+
+    "message": "SD-CUBESAT-001: Payload enabled",
+
+    "rule": "command_enable_payload",
+
+    "subsystem": "payload",
 
 }
 
@@ -80,13 +116,23 @@ class EventResponse(BaseModel):
 
         description=(
 
-            'Kind of event: "Battery", "Recovery", "Warning", or '
+            'Kind of event: "Battery", "Recovery", "Warning", "Critical", '
 
-            '"Critical" — matches the Mission Timeline event types '
+            'or "Command" — matches the Mission Timeline event types '
 
             "already used in the dashboard, so the frontend can render "
 
-            "this value directly."
+            'this value directly. "Command" (see '
+
+            "backend/app/core/commands.py) marks a command's terminal "
+
+            "outcome — EXECUTED or FAILED — distinctly from every "
+
+            "subsystem/alarm-driven event above it; check `severity` to "
+
+            "tell the two apart (None for a successful command, "
+
+            '"Warning" for a failed one).'
 
         ),
 
@@ -104,7 +150,9 @@ class EventResponse(BaseModel):
 
             "backend/app/core/alarms.py. None for Battery and Recovery "
 
-            "events, which are not alarm-classified."
+            "events (not alarm-classified) and for a successfully "
+
+            'EXECUTED Command event; "Warning" for a FAILED Command event.'
 
         ),
 
@@ -146,6 +194,6 @@ class EventResponse(BaseModel):
 
         from_attributes=True,
 
-        json_schema_extra={"examples": [_EXAMPLE_EVENT]}
+        json_schema_extra={"examples": [_EXAMPLE_EVENT, _EXAMPLE_COMMAND_EVENT]}
 
     )

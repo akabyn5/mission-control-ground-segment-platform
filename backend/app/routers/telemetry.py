@@ -212,7 +212,13 @@ async def create_telemetry(
 
         status=computed_status,
 
-        subsystems=telemetry.subsystems
+        subsystems=telemetry.subsystems,
+
+        payload_enabled=telemetry.payload_enabled,
+
+        operating_mode=telemetry.operating_mode,
+
+        computer_state=telemetry.computer_state
 
     )
 
@@ -326,6 +332,8 @@ async def create_telemetry(
 
     message = {
 
+        "type": "telemetry",
+
         "id": db_telemetry.id,
 
         "satellite_id": db_telemetry.satellite_id,
@@ -351,6 +359,12 @@ async def create_telemetry(
         "status": db_telemetry.status,
 
         "subsystems": db_telemetry.subsystems,
+
+        "payload_enabled": db_telemetry.payload_enabled,
+
+        "operating_mode": db_telemetry.operating_mode,
+
+        "computer_state": db_telemetry.computer_state,
 
         "alarms": [alarm.model_dump() for alarm in alarms],
 
@@ -599,6 +613,12 @@ def get_latest_telemetry(
         "status": latest.status,
 
         "subsystems": latest.subsystems,
+
+        "payload_enabled": latest.payload_enabled,
+
+        "operating_mode": latest.operating_mode,
+
+        "computer_state": latest.computer_state,
 
         "alarms": alarms
 
