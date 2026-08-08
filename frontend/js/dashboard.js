@@ -44,6 +44,18 @@ const fleet = new Map();
 
 let selectedSatelliteId = null;
 
+// Set once, in initDashboard(), from GET /config -- the Command Uplink
+
+// functions below are top-level (called from button click handlers and
+
+// showSatellite(), not nested inside initDashboard() like
+
+// bootstrapFleet()/bootstrapEvents()/refreshOrbitTracks() are), so they
+
+// can't close over initDashboard()'s local `config` the way those do.
+
+let dashboardConfig = null;
+
 // Assigned by order of first appearance, not by satellite ID, so this
 
 // file never hardcodes which satellite gets which color.
@@ -235,6 +247,8 @@ function showSatellite(satelliteId) {
     selectedSatelliteId = satelliteId;
 
     satelliteSelector.value = satelliteId;
+
+    refreshCommandUplinkPanel(satelliteId);
 
     if (entry.latest) {
 
@@ -1194,6 +1208,388 @@ function pushTimelineEvents(telemetry) {
 
 // =========================
 
+// Command Uplink — SIMULATION ONLY
+
+// =========================
+
+// Backend-authoritative: this file only sends commands and displays
+
+// whatever backend/app/core/commands.py decides. It never computes a
+
+// command's effect itself. Scoped to `selectedSatelliteId` — the SAME
+
+// selector already used for Live Telemetry/Subsystem Health, per "use the
+
+// existing fleet state and selectors, don't build a second interface."
+
+const commandPayloadStateEl = document.getElementById("commandPayloadState");
+
+const commandOperatingModeStateEl = document.getElementById("commandOperatingModeState");
+
+const commandComputerStateEl = document.getElementById("commandComputerState");
+
+const commandStatusEl = document.getElementById("commandStatus");
+
+const commandHistoryEl = document.getElementById("commandHistory");
+
+const enablePayloadBtn = document.getElementById("enablePayloadBtn");
+
+const restartComputerBtn = document.getElementById("restartComputerBtn");
+
+const changeModeBtn = document.getElementById("changeModeBtn");
+
+const enterSafeModeBtn = document.getElementById("enterSafeModeBtn");
+
+const modeSelect = document.getElementById("modeSelect");
+
+const COMMAND_BUTTONS = [enablePayloadBtn, restartComputerBtn, changeModeBtn, enterSafeModeBtn];
+
+// The most recent command THIS browser tab sent, so live command_update
+
+// messages (which arrive for every command, from every client) only
+
+// update the "latest command status" line when they're actually about
+
+// the command this tab is tracking, rather than showing whichever
+
+// satellite/operator last touched anything.
+
+let trackedCommandId = null;
+
+function setCommandButtonsDisabled(disabled) {
+
+    for (const button of COMMAND_BUTTONS) {
+
+        button.disabled = disabled;
+
+    }
+
+}
+
+function renderSatelliteState(state) {
+
+    commandPayloadStateEl.textContent = state.payload_enabled ? "Enabled" : "Disabled";
+
+    commandOperatingModeStateEl.textContent = state.operating_mode;
+
+    commandComputerStateEl.textContent = state.computer_state;
+
+}
+
+async function fetchSatelliteState(satelliteId) {
+
+    if (!dashboardConfig) {
+
+        return;
+
+    }
+
+    try {
+
+        const response = await fetch(`${dashboardConfig.api_url}/satellite-state/${satelliteId}`);
+
+        if (!response.ok) {
+
+            return;
+
+        }
+
+        const state = await response.json();
+
+        if (satelliteId === selectedSatelliteId) {
+
+            renderSatelliteState(state);
+
+        }
+
+    } catch (error) {
+
+        console.error("Failed to load satellite state:", error);
+
+    }
+
+}
+
+function addCommandHistoryEntry(command) {
+
+    const entryEl = document.createElement("li");
+
+    entryEl.className = "command-history-entry";
+
+    entryEl.innerHTML = `
+
+        <span class="command-history-time">${new Date(command.created_at).toLocaleTimeString()}</span>
+
+        <span class="command-history-satellite">${command.satellite_id}</span>
+
+        <span class="command-history-status status-${command.status.toLowerCase()}">${command.status}</span>
+
+        <span>${command.command_type}${command.parameters ? " (" + JSON.stringify(command.parameters) + ")" : ""}</span>
+
+    `;
+
+    commandHistoryEl.insertBefore(entryEl, commandHistoryEl.firstChild);
+
+    while (commandHistoryEl.children.length > 20) {
+
+        commandHistoryEl.removeChild(commandHistoryEl.lastChild);
+
+    }
+
+}
+
+async function fetchCommandHistory(satelliteId) {
+
+    if (!dashboardConfig) {
+
+        return;
+
+    }
+
+    commandHistoryEl.innerHTML = "";
+
+    try {
+
+        const response = await fetch(
+
+            `${dashboardConfig.api_url}/commands?satellite_id=${encodeURIComponent(satelliteId)}&limit=20`
+
+        );
+
+        if (!response.ok) {
+
+            return;
+
+        }
+
+        const commands = await response.json();
+
+        if (!Array.isArray(commands) || satelliteId !== selectedSatelliteId) {
+
+            return;
+
+        }
+
+        // Newest-first from the API; replay oldest-first so the final
+
+        // insertBefore-based rendering ends up newest-at-top — same
+
+        // pattern as bootstrapFleet()/bootstrapEvents() above.
+
+        commands.slice().reverse().forEach(addCommandHistoryEntry);
+
+    } catch (error) {
+
+        console.error("Failed to load command history:", error);
+
+    }
+
+}
+
+// Called whenever the selected satellite changes (see showSatellite() and
+
+// getOrCreateFleetEntry() below) to load that satellite's current state
+
+// and recent command history fresh.
+
+function refreshCommandUplinkPanel(satelliteId) {
+
+    if (!satelliteId) {
+
+        return;
+
+    }
+
+    fetchSatelliteState(satelliteId);
+
+    fetchCommandHistory(satelliteId);
+
+}
+
+function updateCommandStatusLine(command) {
+
+    commandStatusEl.className = "command-status status-" + command.status.toLowerCase();
+
+    if (command.status === "FAILED") {
+
+        commandStatusEl.textContent =
+
+            `${command.satellite_id}: ${command.command_type} FAILED — ${command.failure_reason || "unknown reason"}`;
+
+    } else {
+
+        commandStatusEl.textContent = `${command.satellite_id}: ${command.command_type} — ${command.status}`;
+
+    }
+
+}
+
+// Handles a live "command_update" WebSocket message — see the dispatch in
+
+// initDashboard()'s socket.onmessage below. NEVER passed into
+
+// updateDashboard(): a command_update message has no telemetry fields
+
+// (latitude/battery/etc.), so treating it as telemetry would throw.
+
+function handleCommandUpdate(message) {
+
+    if (message.id === trackedCommandId || message.satellite_id === selectedSatelliteId) {
+
+        updateCommandStatusLine(message);
+
+    }
+
+    if (message.status === "EXECUTED" || message.status === "FAILED") {
+
+        setCommandButtonsDisabled(false);
+
+        addCommandHistoryEntry(message);
+
+        if (message.satellite_id === selectedSatelliteId) {
+
+            fetchSatelliteState(selectedSatelliteId);
+
+        }
+
+    }
+
+    // The command's terminal mission Event, if any (see
+
+    // backend/app/core/commands.py's _finish()) — rendered through the
+
+    // exact same renderEvent()/eventKey() dedup path as every other event,
+
+    // so it can never appear twice even if GET /events later returns it
+
+    // again after a page refresh.
+
+    if (message.event) {
+
+        renderEvent(message.event);
+
+    }
+
+}
+
+async function sendCommand(satelliteId, commandType, parameters) {
+
+    if (!dashboardConfig) {
+
+        return;
+
+    }
+
+    setCommandButtonsDisabled(true);
+
+    commandStatusEl.className = "command-status status-queued";
+
+    commandStatusEl.textContent = `${satelliteId}: ${commandType} — sending...`;
+
+    try {
+
+        const response = await fetch(`${dashboardConfig.api_url}/commands`, {
+
+            method: "POST",
+
+            headers: { "Content-Type": "application/json" },
+
+            body: JSON.stringify({
+
+                satellite_id: satelliteId,
+
+                command: commandType,
+
+                parameters: parameters || null,
+
+            }),
+
+        });
+
+        if (!response.ok) {
+
+            const body = await response.json().catch(() => ({}));
+
+            commandStatusEl.className = "command-status status-failed";
+
+            commandStatusEl.textContent =
+
+                `${satelliteId}: ${commandType} rejected — ${body.detail || response.status}`;
+
+            setCommandButtonsDisabled(false);
+
+            return;
+
+        }
+
+        const command = await response.json();
+
+        trackedCommandId = command.id;
+
+        updateCommandStatusLine(command);
+
+        // Buttons re-enable when the live command_update WebSocket message
+
+        // reports EXECUTED/FAILED (see handleCommandUpdate above) — not
+
+        // here, since this response is only the initial QUEUED state.
+
+    } catch (error) {
+
+        console.error("Failed to send command:", error);
+
+        commandStatusEl.className = "command-status status-failed";
+
+        commandStatusEl.textContent = `${satelliteId}: ${commandType} — request failed`;
+
+        setCommandButtonsDisabled(false);
+
+    }
+
+}
+
+enablePayloadBtn.addEventListener("click", () => {
+
+    if (selectedSatelliteId) {
+
+        sendCommand(selectedSatelliteId, "ENABLE_PAYLOAD", null);
+
+    }
+
+});
+
+restartComputerBtn.addEventListener("click", () => {
+
+    if (selectedSatelliteId) {
+
+        sendCommand(selectedSatelliteId, "RESTART_COMPUTER", null);
+
+    }
+
+});
+
+changeModeBtn.addEventListener("click", () => {
+
+    if (selectedSatelliteId) {
+
+        sendCommand(selectedSatelliteId, "CHANGE_MODE", { mode: modeSelect.value });
+
+    }
+
+});
+
+enterSafeModeBtn.addEventListener("click", () => {
+
+    if (selectedSatelliteId) {
+
+        sendCommand(selectedSatelliteId, "ENTER_SAFE_MODE", null);
+
+    }
+
+});
+
+// =========================
+
 // Detail panel (Live Telemetry card) — selector-scoped
 
 // =========================
@@ -1308,6 +1704,8 @@ function getOrCreateFleetEntry(satelliteId) {
 
         satelliteSelector.value = satelliteId;
 
+        refreshCommandUplinkPanel(satelliteId);
+
     }
 
     return entry;
@@ -1408,6 +1806,18 @@ async function initDashboard() {
 
     buildSubsystemHealthRows(config.subsystems);
 
+    // Command Uplink functions (see above) are top-level, not nested in
+
+    // this function, so they read `config` through this module-level copy
+
+    // rather than a closure. Must be set before bootstrapFleet() below,
+
+    // since satellite auto-selection (see getOrCreateFleetEntry) calls
+
+    // refreshCommandUplinkPanel() as soon as the first satellite is seen.
+
+    dashboardConfig = config;
+
     // =========================
 
     // WebSocket Connection
@@ -1424,9 +1834,25 @@ async function initDashboard() {
 
     socket.onmessage = (event) => {
 
-        const telemetry = JSON.parse(event.data);
+        const message = JSON.parse(event.data);
 
-        updateDashboard(telemetry);
+        if (message.type === "telemetry") {
+
+            updateDashboard(message);
+
+            return;
+
+        }
+
+        if (message.type === "command_update") {
+
+            handleCommandUpdate(message);
+
+            return;
+
+        }
+
+        console.warn("Unknown WebSocket message type:", message);
 
     };
 

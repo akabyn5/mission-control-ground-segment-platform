@@ -1,0 +1,42 @@
+{
+  "description": "Example POST /commands request bodies. SIMULATION ONLY -- no real spacecraft are controlled. satellite_id must be one of backend/simulator/fleet.py's SATELLITE_IDS.",
+  "examples": [
+    {
+      "name": "Enable Payload",
+      "request": {
+        "satellite_id": "SD-CUBESAT-001",
+        "command": "ENABLE_PAYLOAD"
+      }
+    },
+    {
+      "name": "Restart Computer",
+      "request": {
+        "satellite_id": "SD-CUBESAT-001",
+        "command": "RESTART_COMPUTER"
+      }
+    },
+    {
+      "name": "Change Mode to NOMINAL",
+      "request": {
+        "satellite_id": "SD-CUBESAT-001",
+        "command": "CHANGE_MODE",
+        "parameters": { "mode": "NOMINAL" }
+      }
+    },
+    {
+      "name": "Change Mode to SAFE",
+      "request": {
+        "satellite_id": "SD-CUBESAT-001",
+        "command": "CHANGE_MODE",
+        "parameters": { "mode": "SAFE" }
+      }
+    },
+    {
+      "name": "Enter Safe Mode",
+      "request": {
+        "satellite_id": "SD-CUBESAT-001",
+        "command": "ENTER_SAFE_MODE"
+      }
+    }
+  ]
+}
