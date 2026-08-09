@@ -76,8 +76,8 @@
 
                     <!-- Populated by dashboard.js as satellites are seen.
                          Scopes this panel, the Subsystem Health panel below,
-                         and the three charts further down to a single
-                         satellite at a time. -->
+                         the Command Uplink panel, and the three charts
+                         further down to a single satellite at a time. -->
 
                 </select>
 
@@ -159,6 +159,69 @@
                 <!-- Populated by dashboard.js once GET /config resolves. -->
 
             </div>
+
+        </section>
+
+        <!-- ========================= -->
+
+        <!-- Command Uplink -->
+
+        <!-- ========================= -->
+
+        <!-- SIMULATION ONLY. Scoped to the selector above (selectedSatelliteId)
+             -- reuses the existing satellite selector rather than
+             duplicating it. See buildCommandUplinkPanel()/updateCommandUplinkState()
+             in dashboard.js. -->
+
+        <section class="card">
+
+            <h2>Command Uplink <span class="command-sim-badge">SIMULATION</span></h2>
+
+            <div class="command-state-grid">
+
+                <div class="label">Payload</div>
+
+                <div id="commandPayloadState" class="value">---</div>
+
+                <div class="label">Operating Mode</div>
+
+                <div id="commandOperatingModeState" class="value">---</div>
+
+                <div class="label">Computer</div>
+
+                <div id="commandComputerState" class="value">---</div>
+
+            </div>
+
+            <div class="command-buttons">
+
+                <button id="enablePayloadBtn" class="command-btn">Enable Payload</button>
+
+                <button id="restartComputerBtn" class="command-btn">Restart Computer</button>
+
+                <select id="modeSelect" class="command-select">
+
+                    <option value="NOMINAL">NOMINAL</option>
+
+                    <option value="SAFE">SAFE</option>
+
+                </select>
+
+                <button id="changeModeBtn" class="command-btn">Change Mode</button>
+
+                <button id="enterSafeModeBtn" class="command-btn command-btn-warning">Enter Safe Mode</button>
+
+            </div>
+
+            <div id="commandStatus" class="command-status">No command sent yet.</div>
+
+            <h3>Recent Commands</h3>
+
+            <ul id="commandHistory" class="command-history-list">
+
+                <!-- Populated by dashboard.js from GET /commands. -->
+
+            </ul>
 
         </section>
 
@@ -253,7 +316,7 @@
             <ul id="missionTimeline" class="timeline-list">
 
                 <!-- Populated live by dashboard.js: one entry per Telemetry,
-                     Battery, Recovery, Warning, or Critical event,
+                     Battery, Recovery, Warning, Critical, or Command event,
                      mission-wide (every satellite's events interleave here,
                      not per-satellite like the panels above). Newest event
                      first, capped at the latest 100 entries. -->

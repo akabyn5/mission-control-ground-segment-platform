@@ -68,11 +68,7 @@ class Command(Base):
 
     application restart, independent of
 
-    backend/simulator/satellite_state.py's in-memory *current* simulated
-
-    state, which does not (see that module's docstring for why those are
-
-    deliberately different things).
+    backend/app/models/satellite_state.py's *current* simulated state.
 
     """
 
@@ -140,11 +136,13 @@ class Command(Base):
 
     # When the command was received and queued (== the initial row's
 
-    # creation time; this project executes commands synchronously within
+    # creation time; this project executes commands via a background task
 
-    # one request, so there's no meaningful gap between "queued" and "sent"
+    # started immediately after queuing, so there's no meaningful gap
 
-    # worth a separate column for — see backend/app/core/commands.py).
+    # between "queued" and "sent" worth a separate column for — see
+
+    # backend/app/core/commands.py).
 
     created_at = Column(
 
@@ -170,11 +168,7 @@ class Command(Base):
 
     )
 
-    # Human-readable reason, populated only when status == FAILED — e.g.
-
-    # "Computer is already restarting" (see backend/app/core/commands.py
-
-    # for the one currently-defined failure case).
+    # Human-readable reason, populated only when status == FAILED.
 
     failure_reason = Column(
 

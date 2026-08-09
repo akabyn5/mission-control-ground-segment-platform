@@ -28,7 +28,7 @@ backend/app/models/satellite_state.py's docstring).
 
 """
 
-from datetime import datetime, UTC
+from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 
@@ -196,7 +196,7 @@ async def create_command(
 
         status=CommandStatus.QUEUED,
 
-        created_at=datetime.now(UTC),
+        created_at=datetime.utcnow(),
 
     )
 
@@ -430,9 +430,7 @@ def get_satellite_state(satellite_id: str, db: Session = Depends(get_db)) -> Sat
 
         # and creates a row for every satellite in the fleet — but this is
 
-        # a well-defined, honest 404 rather than a 500 if it's ever hit
-
-        # (e.g. a request arriving before startup finished).
+        # a well-defined, honest 404 rather than a 500 if it's ever hit.
 
         raise HTTPException(
 

@@ -78,41 +78,39 @@ class SatelliteState(Base):
 
     packet — see backend/simulator/telemetry_generator.py).
 
-    This project runs those two as SEPARATE OS processes (per their own
+    This project runs those two as SEPARATE OS processes — there is no
 
-    `python -m uvicorn ...` / `python -m backend.simulator...` commands) —
+    shared Python memory between them. A plain in-process dict is
 
-    there is no shared Python memory between them. A plain in-process
+    invisible across that process boundary; this table — the one thing
 
-    dict, as an earlier version of this feature used, is invisible across
+    both processes actually share, the same SQLite file — is what makes a
 
-    that process boundary: a command would mutate the backend process's
+    command's effect actually reach telemetry. The old in-process module
 
-    copy while the simulator kept reading its own, and the command's
+    `backend/simulator/satellite_state.py` is retired; this is the only
 
-    effect would never reach telemetry. This table — the one thing both
+    satellite-state implementation now.
 
-    processes actually share, the same SQLite file — is what fixes that.
+    One row per satellite, keyed uniquely by `satellite_id` —
 
-    One row per satellite, keyed uniquely by `satellite_id`
-
-    (`ensure_satellite_states()` below creates a default row, idempotently,
+    `ensure_satellite_states()` below creates a default row, idempotently,
 
     for every satellite in SATELLITE_IDS the first time this table is
 
-    empty for that satellite — see backend/app/main.py, which calls it
+    empty for that satellite (see backend/app/main.py, which calls it once
 
-    once at backend startup).
+    at backend startup).
 
     Distinct from the persistent `commands` table
 
     (backend/app/models/command.py): that table is a durable *history* of
 
-    every command ever sent, growing forever; this table is the satellite's
+    every command ever sent, growing forever; this table is the
 
-    *current* state, exactly one row per satellite, overwritten in place —
+    satellite's *current* state, exactly one row per satellite,
 
-    the two intentionally serve different purposes.
+    overwritten in place.
 
     """
 

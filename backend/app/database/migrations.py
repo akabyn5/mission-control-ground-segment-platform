@@ -36,23 +36,31 @@ creating the table from scratch for a brand-new database, and this
 
 function only ever ALTERs a table that already existed going in.
 
+Only EXISTING tables that get NEW COLUMNS need an entry here — a
+
+brand-new TABLE (like `commands`, `events`, or `satellite_state`) needs no
+
+migration entry at all: `Base.metadata.create_all()` already creates any
+
+table that doesn't exist yet, on both a fresh database and an existing one
+
+that only has some of the tables so far.
+
 This intentionally does NOT handle: column removal, column type changes,
 
 or data backfilling — an added column is only ever nullable and starts
 
 NULL on every pre-existing row (see `backend/app/models/telemetry.py`'s
 
-`subsystems = Column(JSON, nullable=True)`, and the corresponding
+`nullable=True` columns, and the corresponding `_default_missing_*`
 
-`_default_missing_subsystems` validator in
+validators in `backend/app/schemas/telemetry.py`, which is what makes
 
-`backend/app/schemas/telemetry.py`, which is what makes NULL a safe,
+NULL a safe, handled value rather than a crash). It also only supports
 
-handled value rather than a crash). It also only supports SQLite. If this
+SQLite. If this project ever needs more than that, that's the signal to
 
-project ever needs more than that, that's the signal to adopt Alembic
-
-instead of growing this file.
+adopt Alembic instead of growing this file.
 
 """
 

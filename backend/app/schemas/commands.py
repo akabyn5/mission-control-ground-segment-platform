@@ -94,13 +94,7 @@ class CommandCreate(BaseModel):
 
     Every other command type takes no parameters at all; supplying any
 
-    for them is rejected rather than silently ignored, since a client
-
-    that thinks a parameter is doing something when it's actually
-
-    discarded is worse than a client that gets a clear error telling it
-
-    so.
+    for them is rejected rather than silently ignored.
 
     """
 

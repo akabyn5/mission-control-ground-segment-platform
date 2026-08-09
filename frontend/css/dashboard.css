@@ -158,11 +158,6 @@ h1 {
 
 /* ========================= */
 
-/* The fleet cards under #fleetSummary reuse .status-card for the outer
-   shell (background/radius/padding/hover), but their inner fields are
-   richer than the old single "one big number" cards, so they use their
-   own classes instead of the .status-card p rule above. */
-
 .fleet-status {
 
     display: block;
@@ -202,9 +197,6 @@ h1 {
     color: #888888;
 
 }
-
-/* Status colors — same palette already used in the Chrome extension
-   popup (chrome-extension/popup.html), reused here for consistency. */
 
 .nominal {
 
@@ -254,10 +246,6 @@ h1 {
 
 /* ========================= */
 
-/* Rows are built by buildSubsystemHealthRows() in dashboard.js, from the
-   ordered subsystem list GET /config returns — this file has no idea how
-   many subsystems there are or what they're called. */
-
 .subsystem-health-list {
 
     display: flex;
@@ -283,18 +271,6 @@ h1 {
     font-weight: bold;
 
 }
-
-/* A pill-shaped badge, layered on top of the plain .nominal/.warning/
-
-   .critical text-color rules above via a compound selector
-
-   (.subsystem-badge.nominal etc. is more specific than .nominal alone),
-
-   so the same three status colors mean the same thing everywhere on the
-
-   dashboard while still getting a distinct colored-background "badge"
-
-   look here, matching the mission-control mockup this panel is based on. */
 
 .subsystem-badge {
 
@@ -331,6 +307,238 @@ h1 {
     background: rgba(244, 67, 54, 0.15);
 
     color: #F44336;
+
+}
+
+/* ========================= */
+
+/* Command Uplink */
+
+/* ========================= */
+
+.command-sim-badge {
+
+    font-size: 11px;
+
+    font-weight: bold;
+
+    color: #FFC107;
+
+    border: 1px solid #FFC107;
+
+    border-radius: 4px;
+
+    padding: 2px 6px;
+
+    margin-left: 8px;
+
+    vertical-align: middle;
+
+}
+
+.command-state-grid {
+
+    display: grid;
+
+    grid-template-columns: 140px 1fr;
+
+    row-gap: 10px;
+
+    margin-bottom: 16px;
+
+}
+
+.command-buttons {
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 10px;
+
+    align-items: center;
+
+    margin-bottom: 14px;
+
+}
+
+.command-btn {
+
+    background: #00E5FF;
+
+    color: #111;
+
+    border: none;
+
+    padding: 9px 16px;
+
+    border-radius: 6px;
+
+    cursor: pointer;
+
+    font-size: 14px;
+
+    font-weight: bold;
+
+    transition: 0.2s;
+
+}
+
+.command-btn:hover:not(:disabled) {
+
+    background: #33ebff;
+
+}
+
+.command-btn:disabled {
+
+    background: #444;
+
+    color: #888;
+
+    cursor: not-allowed;
+
+}
+
+.command-btn-warning {
+
+    background: #FFC107;
+
+}
+
+.command-btn-warning:hover:not(:disabled) {
+
+    background: #ffcd38;
+
+}
+
+.command-select {
+
+    background: #222;
+
+    color: #00E5FF;
+
+    border: 1px solid #333;
+
+    border-radius: 6px;
+
+    padding: 8px 12px;
+
+    font-size: 14px;
+
+}
+
+.command-status {
+
+    padding: 10px 14px;
+
+    border-radius: 8px;
+
+    background: #1a1a1a;
+
+    border: 1px solid #333;
+
+    font-size: 13px;
+
+    margin-bottom: 16px;
+
+}
+
+.command-status.status-queued,
+
+.command-status.status-sent {
+
+    color: #cccccc;
+
+}
+
+.command-status.status-acknowledged {
+
+    color: #00E5FF;
+
+}
+
+.command-status.status-executed {
+
+    color: #4CAF50;
+
+}
+
+.command-status.status-failed {
+
+    color: #F44336;
+
+}
+
+.command-history-list {
+
+    list-style: none;
+
+    margin: 0;
+
+    padding: 0;
+
+    max-height: 240px;
+
+    overflow-y: auto;
+
+}
+
+.command-history-entry {
+
+    display: grid;
+
+    grid-template-columns: 90px 130px 110px 1fr;
+
+    gap: 12px;
+
+    padding: 6px 4px;
+
+    border-bottom: 1px solid #333;
+
+    font-size: 13px;
+
+}
+
+.command-history-entry:last-child {
+
+    border-bottom: none;
+
+}
+
+.command-history-time {
+
+    color: #888888;
+
+}
+
+.command-history-satellite {
+
+    color: #00E5FF;
+
+    font-weight: bold;
+
+}
+
+.command-history-status.status-executed {
+
+    color: #4CAF50;
+
+}
+
+.command-history-status.status-failed {
+
+    color: #F44336;
+
+}
+
+.command-history-status.status-queued,
+
+.command-history-status.status-sent,
+
+.command-history-status.status-acknowledged {
+
+    color: #FFC107;
 
 }
 
@@ -402,10 +610,6 @@ h1 {
 
 /* ========================= */
 
-/* Mission-wide chronological event log (see #missionTimeline in
-   dashboard.js) — not per-satellite, so it lives in its own scrollable
-   list rather than reusing .status-card/.fleet-* like the panels above. */
-
 .timeline-list {
 
     list-style: none;
@@ -468,12 +672,6 @@ h1 {
 
 }
 
-/* Event-type colors for .timeline-type: Telemetry and Recovery both reuse
-   the same green as .nominal ("this is good news"), Battery reuses the
-   same orange as the Temperature chart line, and Warning/Critical reuse
-   the exact same .warning/.critical palette as the fleet cards, so an
-   event's color means the same thing everywhere on the dashboard. */
-
 .timeline-telemetry .timeline-type {
 
     color: #4CAF50;
@@ -504,18 +702,17 @@ h1 {
 
 }
 
+.timeline-command .timeline-type {
+
+    color: #00E5FF;
+
+}
+
 /* ========================= */
 
 /* Alarm System */
 
 /* ========================= */
-
-/* Alarms themselves are evaluated entirely on the backend
-   (backend/app/core/alarms.py) — everything here is purely visual
-   display, driven by dashboard.js reading `telemetry.alarms`. Reuses the
-   exact same .warning/.critical palette already used everywhere else on
-   the dashboard, rather than introducing a new alarm-specific color
-   scheme. */
 
 .alarm-banner {
 
@@ -560,10 +757,6 @@ h1 {
     border: 1px solid #F44336;
 
 }
-
-/* Generic pulse used for both the Critical banner and a fleet card while
-   it has an active Critical alarm — an opacity pulse rather than a
-   color-specific one so the same animation works on any background. */
 
 @keyframes alarm-pulse {
 
