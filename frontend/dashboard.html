@@ -1,346 +1,129 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
 <head>
-
-    <meta charset="UTF-8">
-
-    <title>Mission Control Dashboard</title>
-
-    <link rel="stylesheet" href="css/dashboard.css">
-
-    <link
-
-    rel="stylesheet"
-
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-
-    />
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCGS | Mission Control Ground Segment</title>
+<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
-
 <body>
-
-    <div class="container">
-
-        <header>
-
-            <h1>Mission Control Ground Segment</h1>
-
-        </header>
-
-        <!-- ========================= -->
-
-        <!-- Alarm Banner -->
-
-        <!-- ========================= -->
-
-        <div id="alarmBanner" class="alarm-banner">
-
-            <!-- Hidden while no alarm is active. Shown and updated live by
-                 dashboard.js (see updateAlarmBanner) whenever any satellite
-                 in the fleet has an active Warning or Critical alarm —
-                 Critical always takes priority over Warning if both are
-                 active somewhere in the fleet at once. -->
-
-        </div>
-
-        <!-- ========================= -->
-
-        <!-- Fleet Summary Cards -->
-
-        <!-- ========================= -->
-
-         <section id="fleetSummary" class="status-grid">
-
-            <!-- One card per satellite, created and updated by dashboard.js
-                 as telemetry arrives. Always shows every known satellite
-                 at once (fleet-wide status at a glance). -->
-
-        </section>
-
-        <!-- ========================= -->
-
-        <!-- Live Telemetry Card -->
-
-        <!-- ========================= -->
-
-        <section class="card">
-
-            <div class="map-header">
-
-                <h2>Live Telemetry</h2>
-
-                <select id="satelliteSelector">
-
-                    <!-- Populated by dashboard.js as satellites are seen.
-                         Scopes this panel, the Subsystem Health panel below,
-                         the Command Uplink panel, and the three charts
-                         further down to a single satellite at a time. -->
-
-                </select>
-
-            </div>
-
-            <div class="telemetry-grid">
-
-                <div class="label">Satellite</div>
-
-                <div id="satellite" class="value">---</div>
-
-                <div class="label">Battery</div>
-
-                <div id="battery" class="value">---</div>
-
-                <div class="label">Temperature</div>
-
-                <div id="temperature" class="value">---</div>
-
-                <div class="label">Signal</div>
-
-                <div id="signal" class="value">---</div>
-
-                <div class="label">CPU</div>
-
-                <div id="cpu" class="value">---</div>
-
-                <div class="label">Timestamp</div>
-
-                <div id="timestamp" class="value">---</div>
-
-                <div class="label">Latitude</div>
-
-                <div id="latitude" class="value">---</div>
-
-               
-
-                <div class="label">Longitude</div>
-
-                <div id="longitude" class="value">---</div>
-
-               
-
-                <div class="label">Altitude</div>
-
-                <div id="altitude" class="value">---</div>
-
-               
-
-                <div class="label">Velocity</div>
-
-                <div id="velocity" class="value">---</div>
-
-            </div>
-
-           
-
-        </section>
-
-        <!-- ========================= -->
-
-        <!-- Subsystem Health -->
-
-        <!-- ========================= -->
-
-        <!-- Replaces the old single "Status: Nominal" row above. Rows are
-             built once by buildSubsystemHealthRows() (see dashboard.js),
-             from the ordered subsystem list returned by GET /config —
-             nothing here or in dashboard.js hardcodes the five subsystem
-             names. Scoped to the selected satellite, same as Live
-             Telemetry above. -->
-
-        <section class="card">
-
-            <h2>Subsystem Health</h2>
-
-            <div id="subsystemHealth" class="subsystem-health-list">
-
-                <!-- Populated by dashboard.js once GET /config resolves. -->
-
-            </div>
-
-        </section>
-
-        <!-- ========================= -->
-
-        <!-- Command Uplink -->
-
-        <!-- ========================= -->
-
-        <!-- SIMULATION ONLY. Scoped to the selector above (selectedSatelliteId)
-             -- reuses the existing satellite selector rather than
-             duplicating it. See buildCommandUplinkPanel()/updateCommandUplinkState()
-             in dashboard.js. -->
-
-        <section class="card">
-
-            <h2>Command Uplink <span class="command-sim-badge">SIMULATION</span></h2>
-
-            <div class="command-state-grid">
-
-                <div class="label">Payload</div>
-
-                <div id="commandPayloadState" class="value">---</div>
-
-                <div class="label">Operating Mode</div>
-
-                <div id="commandOperatingModeState" class="value">---</div>
-
-                <div class="label">Computer</div>
-
-                <div id="commandComputerState" class="value">---</div>
-
-            </div>
-
-            <div class="command-buttons">
-
-                <button id="enablePayloadBtn" class="command-btn">Enable Payload</button>
-
-                <button id="restartComputerBtn" class="command-btn">Restart Computer</button>
-
-                <select id="modeSelect" class="command-select">
-
-                    <option value="NOMINAL">NOMINAL</option>
-
-                    <option value="SAFE">SAFE</option>
-
-                </select>
-
-                <button id="changeModeBtn" class="command-btn">Change Mode</button>
-
-                <button id="enterSafeModeBtn" class="command-btn command-btn-warning">Enter Safe Mode</button>
-
-            </div>
-
-            <div id="commandStatus" class="command-status">No command sent yet.</div>
-
-            <h3>Recent Commands</h3>
-
-            <ul id="commandHistory" class="command-history-list">
-
-                <!-- Populated by dashboard.js from GET /commands. -->
-
-            </ul>
-
-        </section>
-
-        <!-- ========================= -->
-
-        <!-- Battery Chart -->
-
-        <!-- ========================= -->
-
-        <section class="card">
-
-            <h2>Battery Chart</h2>
-
-            <div class="chart-container">
-
-                <canvas id="batteryChart"></canvas>
-
-            </div>
-
-        </section>
-
-        <!-- ========================= -->
-
-        <!-- Temperature Chart -->
-
-        <!-- ========================= -->
-
-        <section class="card">
-
-            <h2>Temperature Chart</h2>
-
-            <div class="chart-container">
-
-                <canvas id="temperatureChart"></canvas>
-
-            </div>
-
-        </section>
-
-        <!-- ========================= -->
-
-        <!-- CPU Chart -->
-
-        <!-- ========================= -->
-
-        <section class="card">
-
-            <h2>CPU Chart</h2>
-
-            <div class="chart-container">
-
-                <canvas id="cpuChart"></canvas>
-
-            </div>
-
-        </section>
-
-        <!-- ========================= -->
-
-        <!-- Live Ground Track -->
-
-        <!-- ========================= -->
-
-          <section class="card">
-
-            <div class="map-header">
-
-                <h2>Live Ground Track</h2>
-
-                <button id="trackingButton">
-
-                    Tracking: ON
-
-                </button>
-
-            </div>
-
-            <div id="map"></div>
-
-        </section>
-
-        <!-- ========================= -->
-
-        <!-- Mission Timeline -->
-
-        <!-- ========================= -->
-
-        <section class="card">
-
-            <h2>Mission Timeline</h2>
-
-            <ul id="missionTimeline" class="timeline-list">
-
-                <!-- Populated live by dashboard.js: one entry per Telemetry,
-                     Battery, Recovery, Warning, Critical, or Command event,
-                     mission-wide (every satellite's events interleave here,
-                     not per-satellite like the panels above). Newest event
-                     first, capped at the latest 100 entries. -->
-
-            </ul>
-
-        </section>
-
+<div class="console">
+
+  <header class="mission-header">
+    <div class="mh-brand">
+      <span class="mh-title">MCGS</span>
+      <span class="mh-subtitle">Mission Control Ground Segment</span>
     </div>
+    <div class="mh-status">
+      <span class="mh-item"><span class="mh-dot mh-dot-live"></span>LIVE</span>
+      <span class="mh-item" id="mhClock">--:--:--Z</span>
+      <span class="mh-item mh-sim">SIMULATION</span>
+    </div>
+  </header>
 
-    <!-- Chart.js Library -->
+  <div class="console-grid">
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <section class="panel panel-fleet">
+      <div id="alarmBanner" class="alarm-banner"></div>
+      <h2>Fleet Status</h2>
+      <div id="fleetSummary" class="status-grid"></div>
+    </section>
 
-    <!-- Leaflet -->
+    <section class="panel panel-map">
+      <div class="map-header">
+        <h2>Live Ground Track</h2>
+        <button id="trackingButton">Tracking: ON</button>
+      </div>
+      <div id="map"></div>
+    </section>
 
-     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <section class="panel panel-charts">
+      <h2>Telemetry Plots</h2>
+      <div class="chart-row">
+        <div class="chart-block">
+          <span class="chart-label">BATTERY %</span>
+          <div class="chart-container"><canvas id="batteryChart"></canvas></div>
+        </div>
+        <div class="chart-block">
+          <span class="chart-label">TEMPERATURE &deg;C</span>
+          <div class="chart-container"><canvas id="temperatureChart"></canvas></div>
+        </div>
+        <div class="chart-block">
+          <span class="chart-label">CPU LOAD %</span>
+          <div class="chart-container"><canvas id="cpuChart"></canvas></div>
+        </div>
+      </div>
+    </section>
 
-    <!-- Dashboard Logic -->
+    <section class="panel panel-table">
+      <div class="map-header">
+        <h2>Live Telemetry</h2>
+        <select id="satelliteSelector"></select>
+      </div>
+      <table class="telemetry-table">
+        <tbody>
+          <tr><th>Satellite</th><td id="satellite">---</td><th>Timestamp (UTC)</th><td id="timestamp">---</td></tr>
+          <tr><th>Battery</th><td id="battery">---</td><th>Latitude</th><td id="latitude">---</td></tr>
+          <tr><th>Temperature</th><td id="temperature">---</td><th>Longitude</th><td id="longitude">---</td></tr>
+          <tr><th>Signal</th><td id="signal">---</td><th>Altitude</th><td id="altitude">---</td></tr>
+          <tr><th>CPU</th><td id="cpu">---</td><th>Velocity</th><td id="velocity">---</td></tr>
+        </tbody>
+      </table>
+    </section>
 
-    <script src="js/dashboard.js"></script>
+    <section class="panel panel-subsystems">
+      <h2>Subsystem Health</h2>
+      <div id="subsystemHealth" class="subsystem-health-list"></div>
+    </section>
 
-   
+    <section class="panel panel-commands">
+      <h2>Command Uplink <span class="command-sim-badge">SIMULATION</span></h2>
+      <div class="command-state-grid">
+        <div class="label">Payload</div><div id="commandPayloadState" class="value">---</div>
+        <div class="label">Operating Mode</div><div id="commandOperatingModeState" class="value">---</div>
+        <div class="label">Computer</div><div id="commandComputerState" class="value">---</div>
+      </div>
+      <div class="command-buttons">
+        <button id="enablePayloadBtn" class="command-btn">Enable Payload</button>
+        <button id="restartComputerBtn" class="command-btn">Restart Computer</button>
+        <select id="modeSelect" class="command-select">
+          <option value="NOMINAL">NOMINAL</option>
+          <option value="SAFE">SAFE</option>
+        </select>
+        <button id="changeModeBtn" class="command-btn">Change Mode</button>
+        <button id="enterSafeModeBtn" class="command-btn command-btn-warning">Enter Safe Mode</button>
+      </div>
+      <div id="commandStatus" class="command-status">No command sent yet.</div>
+      <h3>Recent Commands</h3>
+      <ul id="commandHistory" class="command-history-list"></ul>
+    </section>
 
+    <section class="panel panel-timeline">
+      <h2>Mission Event Log</h2>
+      <div class="timeline-columns">
+        <span>TIME</span><span>SATELLITE</span><span>EVENT</span><span>DESCRIPTION</span>
+      </div>
+      <ul id="missionTimeline" class="timeline-list"></ul>
+    </section>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/dashboard.js"></script>
+<script>
+  // Self-contained UTC clock -- does not touch dashboard.js or its
+  // WebSocket/state logic.
+  (function () {
+    var el = document.getElementById("mhClock");
+    function tick() {
+      el.textContent = new Date().toISOString().slice(11, 19) + "Z";
+    }
+    tick();
+    setInterval(tick, 1000);
+  })();
+</script>
 </body>
-
 </html>
