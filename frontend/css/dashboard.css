@@ -1,14 +1,14 @@
 :root {
-  --bg: #0a0d10;
-  --panel: #12171b;
-  --panel-alt: #161c21;
-  --border: #232b30;
-  --text: #d7dde1;
-  --text-dim: #7c8a92;
-  --cyan: #00e5ff;
-  --green: #4caf50;
-  --amber: #ffc107;
-  --red: #f44336;
+  --bg: #0a0f1e;
+  --panel: #11192e;
+  --panel-alt: #17203a;
+  --border: #263252;
+  --text: #e6ebf3;
+  --text-dim: #7c8aab;
+  --cyan: #2dd4ee;
+  --green: #3fae6a;
+  --amber: #f0a83c;
+  --red: #f0483d;
   --font: "Segoe UI", "Consolas", monospace, Arial, Helvetica, sans-serif;
 }
 
@@ -34,15 +34,123 @@ body {
   border-radius: 6px;
   padding: 10px 18px;
   margin-bottom: 12px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
-.mh-brand { display: flex; align-items: baseline; gap: 10px; }
-.mh-title { font-size: 20px; font-weight: 700; color: var(--cyan); letter-spacing: 1px; }
-.mh-subtitle { font-size: 12px; color: var(--text-dim); }
-.mh-status { display: flex; align-items: center; gap: 18px; font-size: 12px; }
-.mh-item { display: flex; align-items: center; gap: 6px; color: var(--text-dim); }
-.mh-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.mh-dot-live { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.mh-sim { color: var(--amber); border: 1px solid var(--amber); border-radius: 3px; padding: 2px 6px; font-weight: 600; }
+.mh-brand { display: flex; align-items: baseline; gap: 10px; flex-shrink: 0; }
+.mh-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.mh-status {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 12px;
+}
+.mh-field {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+}
+.mh-label {
+  color: var(--text-dim);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+.mh-value {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+#mhMission { color: var(--cyan); }
+#mhOrbit { color: var(--text); }
+#mhSource.live { color: var(--green); }
+#mhSource.offline { color: var(--text-dim); }
+#mhLastPacket { color: var(--text); }
+#mhConnection.online { color: var(--green); }
+#mhConnection.offline { color: var(--red); }
+#mhConnection.connecting { color: var(--amber); }
+
+/* ---------- Mission Clock strip ---------- */
+.mission-clock {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 16px;
+  margin-bottom: 12px;
+}
+.mc-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  flex-shrink: 0;
+  padding-right: 12px;
+  border-right: 1px solid var(--border);
+}
+.mc-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 28px;
+  flex: 1;
+  min-width: 0;
+}
+.mc-field {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+}
+.mc-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.mc-value {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+#mcSimSpeed {
+  color: var(--text);
+}
+#mcFrameRate {
+  color: var(--text);
+}
+
+@media (max-width: 1100px) {
+  .mission-clock {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .mc-title {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding-right: 0;
+    padding-bottom: 6px;
+    width: 100%;
+  }
+}
 
 /* ---------- Grid ---------- */
 .console-grid {
@@ -99,39 +207,265 @@ body {
   cursor: pointer;
   transition: background 0.15s;
 }
-.status-card:hover { background: #1c2328; }
+.status-card:hover { background: #1c2745; }
 .status-card h3 { margin: 0 0 4px; font-size: 13px; color: var(--cyan); border: none; padding: 0; }
 .fleet-status { display: block; font-size: 13px; font-weight: 700; margin-top: 2px; }
 .fleet-metrics { display: flex; gap: 12px; margin-top: 6px; font-size: 11px; color: var(--text-dim); }
 .fleet-location, .fleet-updated { margin-top: 4px; font-size: 10px; color: var(--text-dim); }
 
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+.status-indicator .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  display: inline-block;
+  background: currentColor;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+}
+.status-indicator .status-text { color: inherit; }
+.status-indicator.nominal { color: var(--green); }
+.status-indicator.warning { color: var(--amber); }
+.status-indicator.critical { color: var(--red); }
+.status-indicator.unknown { color: var(--text-dim); }
+.status-indicator.nominal .status-dot { background: var(--green); }
+.status-indicator.warning .status-dot { background: var(--amber); }
+.status-indicator.critical .status-dot { background: var(--red); }
+.status-indicator.unknown .status-dot { background: var(--text-dim); }
+
 .nominal { color: var(--green); }
 .warning { color: var(--amber); }
 .critical { color: var(--red); }
+.unknown { color: var(--text-dim); }
 
-/* ---------- Map ---------- */
+.detail-value-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.detail-value-cell .telemetry-value {
+  color: var(--cyan);
+}
+
+/* ---------- Map / Orbit visualization ---------- */
 .map-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .panel-map .map-header h2 { border: none; padding: 0; margin: 0; }
-#map { width: 100%; height: 560px; border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+.map-shell {
+  position: relative;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+#map {
+  width: 100%;
+  height: 620px;
+  background: #0a0f1e;
+}
 #trackingButton {
-  background: var(--green); color: #06110a; border: none;
+  background: var(--cyan); color: #06181c; border: none;
   padding: 6px 14px; border-radius: 4px; cursor: pointer;
   font-size: 12px; font-weight: 700;
 }
 #trackingButton:hover { filter: brightness(1.1); }
 
+.map-legend {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  z-index: 500;
+  background: rgba(10, 15, 30, 0.88);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-size: 10px;
+  color: var(--text);
+  line-height: 1.45;
+  max-width: 220px;
+  pointer-events: none;
+}
+.map-legend-title {
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 4px;
+  font-size: 10px;
+}
+.map-legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+}
+.map-legend-muted { color: var(--text-dim); }
+.map-legend-note {
+  margin: 2px 0 4px 26px;
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+}
+.map-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.map-orbit-disclaimer {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  font-weight: 500;
+}
+.map-legend-swatch {
+  width: 18px;
+  height: 0;
+  border-top: 2px solid var(--cyan);
+  flex-shrink: 0;
+}
+.map-legend-sat {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: none;
+  background: var(--cyan);
+  box-shadow: 0 0 6px var(--cyan);
+}
+.map-legend-current { border-top-color: var(--cyan); border-top-width: 3px; }
+.map-legend-previous { border-top-color: rgba(45, 212, 238, 0.35); border-top-width: 2px; }
+.map-legend-future {
+  border-top: none;
+  border-bottom: 2px dashed var(--amber);
+  height: 0;
+  width: 18px;
+}
+.map-legend-gs {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  border: none;
+  background: var(--text-dim);
+}
+.map-legend-vis {
+  border-top: 2px dotted rgba(124, 138, 171, 0.5);
+}
+
+@media (max-width: 1100px) {
+  #map { height: 420px; }
+  .map-legend { font-size: 9px; max-width: 180px; }
+}
+
 /* ---------- Selector ---------- */
 #satelliteSelector, .command-select {
-  background: #0d1114; color: var(--cyan); border: 1px solid var(--border);
+  background: var(--bg); color: var(--cyan); border: 1px solid var(--border);
   border-radius: 4px; padding: 6px 10px; font-size: 12px;
 }
 
 /* ---------- Charts ---------- */
+/* Chart.js grid/tick colors are set in dashboard.js's createTelemetryChart()
+   and are left untouched, per instructions -- their existing neutral grays
+   remain legible against the navy panel background below. */
 .chart-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .chart-block { min-width: 0; }
 .chart-label { font-size: 10px; color: var(--text-dim); letter-spacing: 0.08em; }
 .chart-container { position: relative; width: 100%; height: 180px; margin-top: 4px; }
 .chart-container canvas { width: 100% !important; height: 100% !important; }
+
+/* ---------- Telemetry circular gauges ---------- */
+.telemetry-gauges {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 4px 0 14px;
+}
+.gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.gauge-ring-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+}
+.gauge-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.gauge-track {
+  fill: none;
+  stroke: #1a2438;
+  stroke-width: 7;
+}
+.gauge-fill {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-dasharray: 226.195;
+  stroke-dashoffset: 226.195;
+  transition: stroke-dashoffset 0.35s ease, stroke 0.25s ease;
+}
+.gauge-fill.nominal { stroke: var(--green); }
+.gauge-fill.warning { stroke: var(--amber); }
+.gauge-fill.critical { stroke: var(--red); }
+.gauge-fill.unknown { stroke: var(--text-dim); }
+.gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.gauge-value {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+.gauge-name {
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+.gauge-status {
+  margin-top: 3px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.gauge-status.nominal { color: var(--green); }
+.gauge-status.warning { color: var(--amber); }
+.gauge-status.critical { color: var(--red); }
+.gauge-status.unknown { color: var(--text-dim); }
+
+@media (max-width: 1100px) {
+  .telemetry-gauges { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) {
+  .telemetry-gauges { grid-template-columns: 1fr 1fr; }
+  .gauge-ring-wrap { width: 88px; height: 88px; }
+}
 
 /* ---------- Telemetry table ---------- */
 .telemetry-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -148,9 +482,9 @@ body {
 .subsystem-row { display: flex; justify-content: space-between; align-items: center; }
 .subsystem-name { font-weight: 600; font-size: 12px; }
 .subsystem-badge { display: inline-block; padding: 2px 10px; border-radius: 3px; font-weight: 700; font-size: 11px; }
-.subsystem-badge.nominal { background: rgba(76,175,80,0.15); color: var(--green); }
-.subsystem-badge.warning { background: rgba(255,193,7,0.15); color: var(--amber); }
-.subsystem-badge.critical { background: rgba(244,67,54,0.15); color: var(--red); }
+.subsystem-badge.nominal { background: rgba(63,174,106,0.15); color: var(--green); }
+.subsystem-badge.warning { background: rgba(240,168,60,0.15); color: var(--amber); }
+.subsystem-badge.critical { background: rgba(240,72,61,0.15); color: var(--red); }
 
 /* ---------- Command Uplink ---------- */
 .command-sim-badge {
@@ -166,9 +500,9 @@ body {
   border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: 700;
 }
 .command-btn:hover:not(:disabled) { filter: brightness(1.1); }
-.command-btn:disabled { background: #333; color: #777; cursor: not-allowed; }
+.command-btn:disabled { background: #2a3350; color: #6b7794; cursor: not-allowed; }
 .command-btn-warning { background: var(--amber); }
-.command-status { padding: 8px 10px; border-radius: 4px; background: #0d1114; border: 1px solid var(--border); font-size: 12px; margin-bottom: 10px; }
+.command-status { padding: 8px 10px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); font-size: 12px; margin-bottom: 10px; }
 .command-status.status-queued, .command-status.status-sent { color: var(--text-dim); }
 .command-status.status-acknowledged { color: var(--cyan); }
 .command-status.status-executed { color: var(--green); }
@@ -203,7 +537,7 @@ body {
 .timeline-description { color: var(--text); }
 .timeline-telemetry .timeline-type { color: var(--green); }
 .timeline-recovery .timeline-type { color: var(--green); }
-.timeline-battery .timeline-type { color: #ff9800; }
+.timeline-battery .timeline-type { color: var(--amber); }
 .timeline-warning .timeline-type { color: var(--amber); }
 .timeline-critical .timeline-type { color: var(--red); }
 .timeline-command .timeline-type { color: var(--cyan); }
@@ -214,8 +548,8 @@ body {
   margin-bottom: 10px; font-weight: 700; font-size: 12px;
 }
 .alarm-banner.visible { display: block; }
-.alarm-banner.level-warning { background: rgba(255,193,7,0.08); color: var(--amber); border: 1px solid var(--amber); }
-.alarm-banner.level-critical { background: rgba(244,67,54,0.08); color: var(--red); border: 1px solid var(--red); }
+.alarm-banner.level-warning { background: rgba(240,168,60,0.08); color: var(--amber); border: 1px solid var(--amber); }
+.alarm-banner.level-critical { background: rgba(240,72,61,0.1); color: var(--red); border: 1px solid var(--red); }
 @keyframes alarm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 .alarm-flash { animation: alarm-pulse 1.2s infinite; }
 

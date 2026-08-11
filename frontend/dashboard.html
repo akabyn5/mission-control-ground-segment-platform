@@ -12,15 +12,53 @@
 
   <header class="mission-header">
     <div class="mh-brand">
-      <span class="mh-title">MCGS</span>
-      <span class="mh-subtitle">Mission Control Ground Segment</span>
+      <span class="mh-title">MISSION CONTROL</span>
     </div>
     <div class="mh-status">
-      <span class="mh-item"><span class="mh-dot mh-dot-live"></span>LIVE</span>
-      <span class="mh-item" id="mhClock">--:--:--Z</span>
-      <span class="mh-item mh-sim">SIMULATION</span>
+      <div class="mh-field">
+        <span class="mh-label">Mission:</span>
+        <span class="mh-value" id="mhMission">---</span>
+      </div>
+      <div class="mh-field">
+        <span class="mh-label">Orbit:</span>
+        <span class="mh-value" id="mhOrbit">LEO</span>
+      </div>
+      <div class="mh-field">
+        <span class="mh-label">Source:</span>
+        <span class="mh-value" id="mhSource">---</span>
+      </div>
+      <div class="mh-field">
+        <span class="mh-label">Last Packet:</span>
+        <span class="mh-value" id="mhLastPacket">---</span>
+      </div>
+      <div class="mh-field">
+        <span class="mh-label">Connection:</span>
+        <span class="mh-value" id="mhConnection">---</span>
+      </div>
     </div>
   </header>
+  
+  <section class="mission-clock" id="missionClock" aria-label="Mission clock">
+    <div class="mc-title">MISSION TIME</div>
+    <div class="mc-fields">
+      <div class="mc-field">
+        <span class="mc-label">UTC</span>
+        <span class="mc-value" id="mcUtc">--:--:-- UTC</span>
+      </div>
+      <div class="mc-field">
+        <span class="mc-label">Mission Elapsed</span>
+        <span class="mc-value" id="mcElapsed">T+00:00:00</span>
+      </div>
+      <div class="mc-field">
+        <span class="mc-label">Sim Speed</span>
+        <span class="mc-value" id="mcSimSpeed">1.0× REALTIME</span>
+      </div>
+      <div class="mc-field">
+        <span class="mc-label">Frame Rate</span>
+        <span class="mc-value" id="mcFrameRate">— FPS</span>
+      </div>
+    </div>
+  </section>
 
   <div class="console-grid">
 
@@ -30,12 +68,27 @@
       <div id="fleetSummary" class="status-grid"></div>
     </section>
 
-    <section class="panel panel-map">
+        <section class="panel panel-map">
       <div class="map-header">
-        <h2>Live Ground Track</h2>
+        <div class="map-header-text">
+          <h2>Orbit / Ground Track</h2>
+          <span class="map-orbit-disclaimer" title="Fleet motion uses the ISS (ZARYA) TLE as a simulation stand-in. Not a real SD-CUBESAT TLE.">Propagated path: SGP4/Skyfield · ISS (ZARYA) TLE stand-in</span>
+        </div>
         <button id="trackingButton">Tracking: ON</button>
       </div>
-      <div id="map"></div>
+      <div class="map-shell">
+        <div id="map"></div>
+        <div class="map-legend" id="mapLegend" aria-label="Orbit legend">
+          <div class="map-legend-title">Legend</div>
+          <div class="map-legend-row"><span class="map-legend-swatch map-legend-sat"></span> Current satellite</div>
+          <div class="map-legend-row"><span class="map-legend-swatch map-legend-current"></span> Current ground track</div>
+          <div class="map-legend-row"><span class="map-legend-swatch map-legend-previous"></span> Previous track</div>
+          <div class="map-legend-row"><span class="map-legend-swatch map-legend-future"></span> Propagated future orbit (simulation)</div>
+          <div class="map-legend-note">SGP4/Skyfield · source: ISS (ZARYA) TLE — stand-in</div>
+          <div class="map-legend-row map-legend-muted"><span class="map-legend-swatch map-legend-gs"></span> Ground station — not configured</div>
+          <div class="map-legend-row map-legend-muted"><span class="map-legend-swatch map-legend-vis"></span> Visible path — not computed</div>
+        </div>
+      </div>
     </section>
 
     <section class="panel panel-charts">
@@ -56,18 +109,70 @@
       </div>
     </section>
 
-    <section class="panel panel-table">
+        <section class="panel panel-table">
       <div class="map-header">
-        <h2>Live Telemetry</h2>
+        <h2>Telemetry Status</h2>
         <select id="satelliteSelector"></select>
+      </div>
+      <div class="telemetry-gauges" id="telemetryGauges">
+        <div class="gauge" data-metric="battery">
+          <div class="gauge-ring-wrap">
+            <svg class="gauge-svg" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="gauge-track" cx="50" cy="50" r="36"></circle>
+              <circle class="gauge-fill" id="gaugeBatteryFill" cx="50" cy="50" r="36"></circle>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-value" id="battery">---</span>
+            </div>
+          </div>
+          <div class="gauge-name">BATTERY</div>
+          <div class="gauge-status unknown" id="gaugeBatteryStatus">---</div>
+        </div>
+        <div class="gauge" data-metric="cpu">
+          <div class="gauge-ring-wrap">
+            <svg class="gauge-svg" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="gauge-track" cx="50" cy="50" r="36"></circle>
+              <circle class="gauge-fill" id="gaugeCpuFill" cx="50" cy="50" r="36"></circle>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-value" id="cpu">---</span>
+            </div>
+          </div>
+          <div class="gauge-name">CPU</div>
+          <div class="gauge-status unknown" id="gaugeCpuStatus">---</div>
+        </div>
+        <div class="gauge" data-metric="signal">
+          <div class="gauge-ring-wrap">
+            <svg class="gauge-svg" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="gauge-track" cx="50" cy="50" r="36"></circle>
+              <circle class="gauge-fill" id="gaugeSignalFill" cx="50" cy="50" r="36"></circle>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-value" id="signal">---</span>
+            </div>
+          </div>
+          <div class="gauge-name">SIGNAL</div>
+          <div class="gauge-status unknown" id="gaugeSignalStatus">---</div>
+        </div>
+        <div class="gauge" data-metric="temperature">
+          <div class="gauge-ring-wrap">
+            <svg class="gauge-svg" viewBox="0 0 100 100" aria-hidden="true">
+              <circle class="gauge-track" cx="50" cy="50" r="36"></circle>
+              <circle class="gauge-fill" id="gaugeTemperatureFill" cx="50" cy="50" r="36"></circle>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-value" id="temperature">---</span>
+            </div>
+          </div>
+          <div class="gauge-name">TEMPERATURE</div>
+          <div class="gauge-status unknown" id="gaugeTemperatureStatus">---</div>
+        </div>
       </div>
       <table class="telemetry-table">
         <tbody>
           <tr><th>Satellite</th><td id="satellite">---</td><th>Timestamp (UTC)</th><td id="timestamp">---</td></tr>
-          <tr><th>Battery</th><td id="battery">---</td><th>Latitude</th><td id="latitude">---</td></tr>
-          <tr><th>Temperature</th><td id="temperature">---</td><th>Longitude</th><td id="longitude">---</td></tr>
-          <tr><th>Signal</th><td id="signal">---</td><th>Altitude</th><td id="altitude">---</td></tr>
-          <tr><th>CPU</th><td id="cpu">---</td><th>Velocity</th><td id="velocity">---</td></tr>
+          <tr><th>Latitude</th><td id="latitude">---</td><th>Longitude</th><td id="longitude">---</td></tr>
+          <tr><th>Altitude</th><td id="altitude">---</td><th>Velocity</th><td id="velocity">---</td></tr>
         </tbody>
       </table>
     </section>
@@ -113,17 +218,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="js/dashboard.js"></script>
-<script>
-  // Self-contained UTC clock -- does not touch dashboard.js or its
-  // WebSocket/state logic.
-  (function () {
-    var el = document.getElementById("mhClock");
-    function tick() {
-      el.textContent = new Date().toISOString().slice(11, 19) + "Z";
-    }
-    tick();
-    setInterval(tick, 1000);
-  })();
-</script>
+
 </body>
 </html>
