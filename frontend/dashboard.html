@@ -4,12 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MCGS | Mission Control Ground Segment</title>
-<link rel="stylesheet" href="css/dashboard.css">
+<link rel="stylesheet" href="css/dashboard.css?v=polish13">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 </head>
 <body>
 <div class="console">
-
   <header class="mission-header">
     <div class="mh-brand">
       <span class="mh-title">MISSION CONTROL</span>
@@ -37,7 +36,7 @@
       </div>
     </div>
   </header>
-  
+
   <section class="mission-clock" id="missionClock" aria-label="Mission clock">
     <div class="mc-title">MISSION TIME</div>
     <div class="mc-fields">
@@ -50,8 +49,8 @@
         <span class="mc-value" id="mcElapsed">T+00:00:00</span>
       </div>
       <div class="mc-field">
-        <span class="mc-label">Sim Speed</span>
-        <span class="mc-value" id="mcSimSpeed">1.0× REALTIME</span>
+        <span class="mc-label">Update Rate</span>
+        <span class="mc-value" id="mcUpdateRate">---</span>
       </div>
       <div class="mc-field">
         <span class="mc-label">Frame Rate</span>
@@ -60,15 +59,96 @@
     </div>
   </section>
 
-  <div class="console-grid">
+  <section class="conn-monitor" id="connMonitor" aria-label="Connection monitor">
+    <div class="conn-title">CONNECTION</div>
+    <div class="conn-fields">
+      <div class="conn-field">
+        <span class="conn-label">Packets RX</span>
+        <span class="conn-value" id="connPacketsRx">0</span>
+      </div>
+      <div class="conn-field">
+        <span class="conn-label">Gaps (est.)</span>
+        <span class="conn-value" id="connPacketsLost">0</span>
+      </div>
+      <div class="conn-field">
+        <span class="conn-label">Last Δ</span>
+        <span class="conn-value" id="connLatency">—</span>
+      </div>
+      <div class="conn-field">
+        <span class="conn-label">WebSocket</span>
+        <span class="conn-value" id="connWs">—</span>
+      </div>
+      <div class="conn-field">
+        <span class="conn-label">REST</span>
+        <span class="conn-value" id="connRest">—</span>
+      </div>
+      <div class="conn-field">
+        <span class="conn-label">Database</span>
+        <span class="conn-value" id="connDb" title="No dedicated DB health endpoint; inferred from REST /config">—</span>
+      </div>
+    </div>
+  </section>
 
+  <div class="ops-toolbar" id="opsToolbar" aria-label="Operations toolbar">
+    <nav class="ops-nav" aria-label="Section navigation">
+      <a href="#fleetSummary" class="ops-nav-link" data-scroll="panel-fleet">Fleet</a>
+      <a href="#map" class="ops-nav-link" data-scroll="panel-map">Orbit</a>
+      <a href="#batteryChart" class="ops-nav-link" data-scroll="panel-charts">Plots</a>
+      <a href="#telemetryGauges" class="ops-nav-link" data-scroll="panel-table">Telemetry</a>
+      <a href="#subsystemHealth" class="ops-nav-link" data-scroll="panel-subsystems">Subsystems</a>
+      <a href="#commandStatus" class="ops-nav-link" data-scroll="panel-commands">Commands</a>
+      <a href="#missionTimeline" class="ops-nav-link" data-scroll="panel-timeline">Events</a>
+    </nav>
+    <div class="ops-actions">
+      <button type="button" class="ops-btn" id="btnFullscreen" title="Fullscreen (F)">Fullscreen</button>
+      <button type="button" class="ops-btn" id="btnTheme" title="Toggle light/dark (T)">Theme</button>
+      <button type="button" class="ops-btn" id="btnExportCsv" title="Export telemetry CSV (C)">CSV</button>
+      <button type="button" class="ops-btn" id="btnExportPdf" title="Export mission report">Report</button>
+      <button type="button" class="ops-btn" id="btnScreenshot" title="Screenshot (S)">Shot</button>
+      <button type="button" class="ops-btn" id="btnSettings" title="Settings (,)">Settings</button>
+    </div>
+  </div>
+
+  <div class="settings-panel" id="settingsPanel" hidden>
+    <div class="settings-panel-header">
+      <h2>Settings</h2>
+      <button type="button" class="ops-btn" id="btnSettingsClose">Close</button>
+    </div>
+    <div class="settings-grid">
+      <label class="settings-row">
+        <span>Theme</span>
+        <select id="settingTheme" class="command-select">
+          <option value="dark">Dark (ops)</option>
+          <option value="light">Light</option>
+        </select>
+      </label>
+      <label class="settings-row">
+        <span>Animations</span>
+        <select id="settingAnim" class="command-select">
+          <option value="on">On</option>
+          <option value="off">Off</option>
+        </select>
+      </label>
+      <p class="settings-hint">Shortcuts: F fullscreen · T theme · C CSV · S screenshot · , settings · 1–7 jump panels · Esc close</p>
+    </div>
+  </div>
+
+  <div class="console-grid">
     <section class="panel panel-fleet">
-      <div id="alarmBanner" class="alarm-banner"></div>
+      <div id="alarmBanner" class="alarm-banner" role="status" aria-live="polite"></div>
+      <div class="alarm-panel" id="alarmPanel">
+        <div class="alarm-panel-header">
+          <h2 class="alarm-panel-title">Active Alarms</h2>
+          <span class="alarm-panel-count" id="alarmPanelCount">0</span>
+        </div>
+        <ul class="alarm-panel-list" id="alarmPanelList">
+          <li class="alarm-panel-empty" id="alarmPanelEmpty">No active alarms</li>
+        </ul>
+      </div>
       <h2>Fleet Status</h2>
       <div id="fleetSummary" class="status-grid"></div>
     </section>
-
-        <section class="panel panel-map">
+    <section class="panel panel-map">
       <div class="map-header">
         <div class="map-header-text">
           <h2>Orbit / Ground Track</h2>
@@ -90,9 +170,27 @@
         </div>
       </div>
     </section>
-
     <section class="panel panel-charts">
-      <h2>Telemetry Plots</h2>
+      <div class="map-header">
+        <h2>Telemetry Plots</h2>
+        <div class="replay-controls" id="replayControls" aria-label="Historical replay">
+          <span class="replay-label">History</span>
+          <select id="replayRangeSelect" class="command-select" title="Telemetry history window">
+            <option value="live" selected>Live</option>
+            <option value="1h">Last hour</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="today">Today</option>
+            <option value="custom">Custom</option>
+          </select>
+          <span class="replay-custom" id="replayCustomFields" hidden>
+            <input type="datetime-local" id="replayFrom" class="replay-dt" title="From (local)" />
+            <span class="replay-sep">→</span>
+            <input type="datetime-local" id="replayTo" class="replay-dt" title="To (local)" />
+            <button type="button" id="replayApplyBtn" class="chart-reset-zoom">Load</button>
+          </span>
+          <span class="replay-status" id="replayStatus">LIVE</span>
+        </div>
+      </div>
       <div class="chart-row">
         <div class="chart-block">
           <span class="chart-label">BATTERY %</span>
@@ -107,9 +205,16 @@
           <div class="chart-container"><canvas id="cpuChart"></canvas></div>
         </div>
       </div>
+      <div class="time-slider-bar" id="timeSliderBar" hidden>
+        <button type="button" id="timeSliderPlay" class="time-slider-btn" title="Play / pause scrub">▶</button>
+        <input type="range" id="timeSlider" class="time-slider" min="0" max="0" value="0" step="1" disabled />
+        <span class="time-slider-meta">
+          <span id="timeSliderIndex">0 / 0</span>
+          <span id="timeSliderStamp">—</span>
+        </span>
+      </div>
     </section>
-
-        <section class="panel panel-table">
+    <section class="panel panel-table">
       <div class="map-header">
         <h2>Telemetry Status</h2>
         <select id="satelliteSelector"></select>
@@ -168,6 +273,36 @@
           <div class="gauge-status unknown" id="gaugeTemperatureStatus">---</div>
         </div>
       </div>
+      <div class="metric-sparklines" id="metricSparklines">
+        <div class="metric-card" id="batteryMetricCard">
+          <div class="metric-card-header">
+            <span class="metric-card-label">Battery</span>
+            <span class="metric-card-value" id="batteryMetricValue">—</span>
+          </div>
+          <svg class="sparkline" id="batterySparkline" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+        <div class="metric-card" id="temperatureMetricCard">
+          <div class="metric-card-header">
+            <span class="metric-card-label">Temperature</span>
+            <span class="metric-card-value" id="temperatureMetricValue">—</span>
+          </div>
+          <svg class="sparkline" id="temperatureSparkline" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+        <div class="metric-card" id="signalMetricCard">
+          <div class="metric-card-header">
+            <span class="metric-card-label">Signal</span>
+            <span class="metric-card-value" id="signalMetricValue">—</span>
+          </div>
+          <svg class="sparkline" id="signalSparkline" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+        <div class="metric-card" id="cpuMetricCard">
+          <div class="metric-card-header">
+            <span class="metric-card-label">CPU</span>
+            <span class="metric-card-value" id="cpuMetricValue">—</span>
+          </div>
+          <svg class="sparkline" id="cpuSparkline" viewBox="0 0 120 28" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+      </div>
       <table class="telemetry-table">
         <tbody>
           <tr><th>Satellite</th><td id="satellite">---</td><th>Timestamp (UTC)</th><td id="timestamp">---</td></tr>
@@ -176,12 +311,10 @@
         </tbody>
       </table>
     </section>
-
     <section class="panel panel-subsystems">
       <h2>Subsystem Health</h2>
       <div id="subsystemHealth" class="subsystem-health-list"></div>
     </section>
-
     <section class="panel panel-commands">
       <h2>Command Uplink <span class="command-sim-badge">SIMULATION</span></h2>
       <div class="command-state-grid">
@@ -203,7 +336,6 @@
       <h3>Recent Commands</h3>
       <ul id="commandHistory" class="command-history-list"></ul>
     </section>
-
     <section class="panel panel-timeline">
       <h2>Mission Event Log</h2>
       <div class="timeline-columns">
@@ -211,13 +343,13 @@
       </div>
       <ul id="missionTimeline" class="timeline-list"></ul>
     </section>
-
   </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="js/dashboard.js"></script>
-
+<script src="js/dashboard.js?v=polish13"></script>
 </body>
 </html>
